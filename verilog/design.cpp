@@ -163,6 +163,8 @@ Hierarchy Design::get_hierarchy() {
     hierarchy += "\t}\n";
     hierarchy += "}";
 
+    std::cout << hierarchy << std::endl;
+
     // Transform this to Json::Value
     Json::Value root;
     Json::Reader reader;

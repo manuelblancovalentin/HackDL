@@ -14,17 +14,26 @@ void VerilogBlock::__build_subhierarchy__(std::string TAB = ""){
     //std::vector<NetWire>* tmp_netwires = &(this->netwires);
     //std::vector<VerilogBlock>* tmp_instances = &(this->instances);
 
+    int nimax = instances.size();
+    int pmax = parameters.size();
+
     bool print_params = !parameters.empty();
     bool print_ports = !ports.input.empty() || !ports.output.empty() || !ports.inout.empty();
     bool print_netwires = !netwires.empty();
     bool print_instances = !instances.empty();
 
+
     // Place reference
     if (ref.compare("module") == 0){
-        subhierarchy = string_format("%s\"ref\" : \"%s\",\n", TAB.c_str(), name.c_str());
+        subhierarchy = string_format("%s\"ref\" : \"%s\"", TAB.c_str(), name.c_str());
     } else {
-        subhierarchy = string_format("%s\"ref\" : \"%s\",\n", TAB.c_str(), ref.c_str());
+        subhierarchy = string_format("%s\"ref\" : \"%s\"", TAB.c_str(), ref.c_str());
     }
+
+    if (print_params|print_ports|print_netwires|print_instances){
+        subhierarchy += ",";
+    }
+    subhierarchy += "\n";
 
     //tmp["ref"] = ref;
 
@@ -32,7 +41,7 @@ void VerilogBlock::__build_subhierarchy__(std::string TAB = ""){
     if (print_params){
         // Open parameters field
         subhierarchy += string_format("%s\"parameters\" : \n%s{\n", TAB.c_str(), TAB.c_str());
-        int pmax = parameters.size();
+
         for (int p = 0; p < pmax; p++){
             subhierarchy += string_format("%s\t\"%s\" : \"%s\"", TAB.c_str(),
                                        parameters[p].name.c_str(),
@@ -142,8 +151,9 @@ void VerilogBlock::__build_subhierarchy__(std::string TAB = ""){
         }
     }
 
+
     if (print_instances){
-        int nimax = instances.size();
+
         int ni = 0;
         for (auto& it: instances) {
             // Open netwire field
