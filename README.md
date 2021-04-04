@@ -8,11 +8,19 @@ This is missing
 
 ## Installation
 
-This is missing
+```bash
+$> git clone git@github.com/manuelblancovalentin/HackDL
+$> cd HackDL
+$> cmake .
+$> make clean && make all
+```
 
 ## How to use
 
-This is missing
+Simply call:
+```bash
+$> ./HackDL
+```
 
 
 
