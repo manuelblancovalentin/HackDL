@@ -6,6 +6,7 @@
 #include "Parser.h"
 #include "blocks.h"
 #include <iostream>
+#include <climits>
 
 // Get hierarchy method
 Hierarchy Design::get_hierarchy() {
