@@ -7,6 +7,8 @@
 #include "blocks.h"
 #include <iostream>
 #include <climits>
+#include <filesystem>
+
 
 // Get hierarchy method
 Hierarchy Design::get_hierarchy() {
@@ -25,6 +27,25 @@ Hierarchy Design::get_hierarchy() {
 
     // Keep track of instances that have not been defined
     std::map<std::string,std::vector<std::string>> orphan_instances;
+
+    // Append *.v and *.sv from LIBS to SOURCES
+    for (auto dir : Design::LIB){
+        for (const auto & entry : std::filesystem::directory_iterator(dir))
+            if ((entry.path().extension() == ".sv") || (entry.path().extension() == ".v"))
+            {
+                bool found = false;
+                for (auto src: src_left){
+                    found |= (src == entry.path());
+                }
+
+                if (!found){
+                    std::cout << "Adding file " << entry.path() << " to sources" << std::endl;
+                    src_left.push_back(entry.path());
+                }
+            }
+
+    }
+
 
     while (!src_left.empty()){
         // Get first element

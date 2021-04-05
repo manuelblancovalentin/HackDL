@@ -142,57 +142,94 @@ std::regex __VLOG_BLOCK_COMMENT_END_REGEX__("(\\*\\/)");
 
 // Gate Primitives
 int __VLOG_NUM_GATE_PRIMITIVES__ = 14;
-std::vector<std::string> __VLOG_GATE_PRIMITIVES__ = {"and ", "buf ", "bufif0 ", "bufif1 ", "nand ", "nor ", "not ",
-                                                     "or ", "xnor ", "xor ", "pulldown ", "pullup ", "notif0 ",
-                                                     "notif1 "};
+std::vector<std::string> __VLOG_GATE_PRIMITIVES__ = {"and", "buf", "bufif0", "bufif1", "nand", "nor", "not",
+                                                     "or", "xnor", "xor", "pulldown", "pullup", "notif0",
+                                                     "notif1"};
 
 
 // Switch primitive
 int __VLOG_NUM_SWITCH_PRIMITIVES__ = 14;
-std::vector<std::string> __VLOG_SWITCH_PRIMITIVES__ = {"cmos ", "nmos ", "pmos ", "remos ", "rnmos ", "rpmos ", "rtran ",
-                                                       "rtranif0 ", "rtranif1 ", "tran ", "tranif0 ", "tranif1 "};
+std::vector<std::string> __VLOG_SWITCH_PRIMITIVES__ = {"cmos", "nmos", "pmos", "remos", "rnmos", "rpmos", "rtran",
+                                                       "rtranif0", "rtranif1", "tran", "tranif0", "tranif1"};
 
 
 // Keywords that end with a semicolon
 int __VLOG_NUM_SEMICOLON_STATEMENTS__ = 18;
-std::vector<std::string> __VLOG_SEMICOLON_STATEMENTS__ = {"assign ", "deassign ", "defparam ", "design ", "default ",
-                                                          "instance ", "disable ", "force ", "genvar ", "release ",
-                                                          "event ", "wait ", "specparam ", "edge ", "showcancelled ",
-                                                          "noshowcancelled ", "pulsestyle_oneventglitch ",
-                                                          "pulsestyle_ondetectglitch "};
+std::vector<std::string> __VLOG_SEMICOLON_STATEMENTS__ = {"assign", "deassign", "defparam", "design", "default",
+                                                          "instance", "disable", "force", "genvar", "release",
+                                                          "event", "wait", "specparam", "edge", "showcancelled",
+                                                          "noshowcancelled", "pulsestyle_oneventglitch",
+                                                          "pulsestyle_ondetectglitch"};
+
+// STRUCT
+std::regex __VLOG_STRUCT_PATTERN__("(struct)\\s*\\{((.|\\n)*)\\}\\s+(\\w+)\\b\\s*\\;");
 
 
 // NETWIRES
-int __VLOG_NUM_PATTERNS_NETWIRES__ = 16;
-std::vector<std::string> __VLOG_PATTERNS_NETWIRES__ = {"input", "output", "inout",
-                                                       "integer ", "real ", "realtime ", "reg ", "time ",
-                                                        "wire ", "supply0 ", "supply1 ", "tri ", "triand ", "trior ",
-                                                        "tri0 ", "tri1 ", "wand ", "wor ", "trireg "};
+int __VLOG_NUM_PATTERNS_NETWIRES__ = 20;
+std::vector<std::string> __VLOG_PATTERNS_NETWIRES__ = {"input", "output", "inout", "int","logic","string",
+                                                       "integer", "real", "realtime", "reg", "time",
+                                                        "wire", "supply0", "supply1", "tri", "triand", "trior",
+                                                        "tri0", "tri1", "wand", "wor", "trireg"};
 
 // BEGIN/END STATEMENTS
 std::regex __VLOG_BEGIN_REGEX__("\\b(begin)\\b");
 std::regex __VLOG_END_REGEX__("\\b(end)\\b");
-int __VLOG_NUM_PATTERNS_STATEMENTS__ = 11;
-std::vector<std::string> __VLOG_PATTERNS_STATEMENTS__ = {"if ", "else ", "initial ", "always ", "for ",
-                                              "while ", "do ", "repeat ", "forever ", "ifnone ", "repeat "};
+int __VLOG_NUM_PATTERNS_STATEMENTS__ = 14;
+std::vector<std::string> __VLOG_PATTERNS_STATEMENTS__ = {"if", "else", "initial", "always", "for",
+                                              "while", "do", "repeat", "forever ", "ifnone", "repeat",
+                                              "always_comb", "always_ff", "always_latch"};
+
+int __VLOG_NUM_PATTERNS_NON_NESTABLE_POST_KEYWORDS__ = 107;
+std::vector<std::string> __VLOG_PATTERNS_NON_NESTABLE_POST_KEYWORDS__ = {"and", "buf", "bufif0", "bufif1", "nand", "nor", "not", "or", "xnor", "xor",
+                                                                     "pulldown", "pullup", "notif0", "notif1", "cmos", "nmos", "pmos", "remos",
+                                                                     "rnmos", "rpmos", "rtran", "rtranif0", "rtranif1", "tran", "tranif0", "tranif1",
+                                                                     "assign", "deassign", "defparam", "design", "default", "instance", "disable",
+                                                                     "force", "genvar", "release", "event", "wait", "specparam", "edge", "showcancelled",
+                                                                     "noshowcancelled", "pulsestyle_oneventglitch", "pulsestyle_ondetectglitch",
+                                                                     "input", "output", "inout", "int", "logic", "string", "integer", "real",
+                                                                     "realtime", "reg", "time", "wire", "supply0", "supply1", "tri", "triand", "trior",
+                                                                     "tri0", "tri1", "wand", "wor", "trireg", "struct", "end",
+                                                                     "initial", "always", "repeat", "forever ", "ifnone",
+                                                                     "always_comb", "always_ff", "always_latch", "localparam", "parameter", "module",
+                                                                     "macromodule", "endmodule", "function", "task", "fork", "case", "casex", "casez",
+                                                                     "generate", "config", "primitive", "specify", "table", "task", "join", "case",
+                                                                     "casex", "casez", "endcase", "endgenerate", "endconfig", "endprimitive", "endspecify",
+                                                                     "endtable", "endtask", "automatic", "cell", "struct"};
+
+std::regex __VLOG_REGEX_NON_NESTABLE_POST_KEYWORDS__("\\b(and|buf|bufif0|bufif1|nand|nor|not|or|xnor|xor|pulldown|pullup|notif0|notif1|cmos|nmos|pmos|remos|rnmos|rpmos|rtran|rtranif0|rtranif1|tran|tranif0|tranif1|assign|deassign|defparam|design|default|instance|disable|force|genvar|release|event|wait|specparam|edge|showcancelled|noshowcancelled|pulsestyle_oneventglitch|pulsestyle_ondetectglitch|input|output|inout|int|logic|string|integer|real|realtime|reg|time|wire|supply0|supply1|tri|triand|trior|tri0|tri1|wand|wor|trireg|struct|end|initial|always|repeat|forever |ifnone|always_comb|always_ff|always_latch|localparam|parameter|module|macromodule|endmodule|function|task|fork|case|casex|casez|generate|config|primitive|specify|table|task|join|case|casex|casez|endcase|endgenerate|endconfig|endprimitive|endspecify|endtable|endtask|automatic|cell|struct)\\b");
+
+
+int __VLOG_NUM_PATTERNS_NON_NESTABLE_KEYWORDS__ = 24;
+std::vector<std::string> __VLOG_PATTERNS_NON_NESTABLE_KEYWORDS__ = {"default", "instance", "event", "wait", "edge",
+                                                                    "pulsestyle_oneventglitch", "pulsestyle_ondetectglitch",
+                                                                    "initial", "always", "repeat", "ifnone",
+                                                                    "always_comb", "always_ff", "always_latch", "module",
+                                                                    "macromodule", "endmodule", "endfunction",
+                                                                    "endgenerate", "endconfig", "endprimitive", "endspecify",
+                                                                    "endtable", "endtask"};
+
+std::regex __VLOG_REGEX_NON_NESTABLE_KEYWORDS__("\\b(default|instance|event|wait|edge|pulsestyle_oneventglitch|pulsestyle_ondetectglitch|initial|always|repeat|ifnone|always_comb|always_ff|always_latch|endmodule|endfunction|endgenerate|endconfig|endprimitive|endspecify|endtable|endtask)\\b");
+
+
 
 // PARAMETERS (semicolon statements, but treated separatedly, as we DO want to parse them)
 int __VLOG_NUM_PATTERNS_PARAMS__ = 2;
-std::vector<std::string> __VLOG_PATTERNS_PARAMS__ = {"localparam ", "parameter "};
+std::vector<std::string> __VLOG_PATTERNS_PARAMS__ = {"localparam", "parameter"};
 
 
 
 // Module|Macromodule/Endmodule group
 int __VLOG_NUM_MODULE_NAMES__ = 2;
-std::vector<std::string> __VLOG_MODULE_NAMES__ = {"module ", "macromodule "};
+std::vector<std::string> __VLOG_MODULE_NAMES__ = {"module", "macromodule"};
 
 std::regex __VLOG_MODULE_REGEX__("\\b(module|macromodule)\\b");
 std::regex __VLOG_ENDMODULE_REGEX__("\\b(endmodule)\\b");
 
 // Groups
 int __VLOG_NUM_GROUPS__ = 12;
-std::vector<std::string> __VLOG_GROUPS__ = {"function ", "task ", "fork ", "case ", "casex ", "casez ",
-                                           "generate ", "config ", "primitive ", "specify ", "table ", "task "};
+std::vector<std::string> __VLOG_GROUPS__ = {"function", "task", "fork", "case", "casex", "casez",
+                                           "generate", "config", "primitive", "specify", "table", "task"};
 
 
 // Function/endfunction group
@@ -205,7 +242,7 @@ std::regex __VLOG_JOIN_REGEX__("\\b(join)\\b");
 
 // Case(Z|X)/Endcase group
 int __VLOG_NUM_CASES__ = 3;
-std::vector<std::string> __VLOG_CASES__ = {"case ", "casex ", "casez "};
+std::vector<std::string> __VLOG_CASES__ = {"case", "casex", "casez"};
 
 std::regex __VLOG_CASE_REGEX__("\\b(case)\\b");
 std::regex __VLOG_CASEX_REGEX__("\\b(casex)\\b");
@@ -239,7 +276,28 @@ std::regex __VLOG_ENDTASK_REGEX__("\\b(endtask)\\b");
 
 // keywords in general (attributes)
 int __VLOG_NUM_ATTRIBUTES__ = 2;
-std::vector<std::string> __VLOG_ATTRIBUTES__ = {"automatic ", "cell "};
+std::vector<std::string> __VLOG_ATTRIBUTES__ = {"automatic", "cell"};
+
+
+
+// INSTANCE REGEX
+std::vector __VLOG_ALL_KEYWORDS__ = {"and", "buf", "bufif0", "bufif1", "nand", "nor", "not", "or", "xnor", "xor",
+                                     "pulldown", "pullup", "notif0", "notif1", "cmos", "nmos", "pmos", "remos",
+                                     "rnmos", "rpmos", "rtran", "rtranif0", "rtranif1", "tran", "tranif0", "tranif1",
+                                     "assign", "deassign", "defparam", "design", "default", "instance", "disable",
+                                     "force", "genvar", "release", "event", "wait", "specparam", "edge", "showcancelled",
+                                     "noshowcancelled", "pulsestyle_oneventglitch", "pulsestyle_ondetectglitch",
+                                     "input", "output", "inout", "int", "logic", "string", "integer", "real",
+                                     "realtime", "reg", "time", "wire", "supply0", "supply1", "tri", "triand", "trior",
+                                     "tri0", "tri1", "wand", "wor", "trireg", "struct", "begin", "end", "if", "else",
+                                     "initial", "always", "for", "while", "do", "repeat", "forever ", "ifnone", "repeat",
+                                     "always_comb", "always_ff", "always_latch", "localparam", "parameter", "module",
+                                     "macromodule", "endmodule", "function", "task", "fork", "case", "casex", "casez",
+                                     "generate", "config", "primitive", "specify", "table", "task", "join", "case",
+                                     "casex", "casez", "endcase", "endgenerate", "endconfig", "endprimitive", "endspecify",
+                                     "endtable", "endtask", "automatic", "cell", "begin", "end", "struct"};
+int __VLOG_NUM_KEYWORDS__ = 116;
+std::regex __VLOG_INSTANCE_PATTERN__("\\b(?!and|buf|bufif0|bufif1|nand|nor|not|or|xnor|xor|pulldown|pullup|notif0|notif1|cmos|nmos|pmos|remos|rnmos|rpmos|rtran|rtranif0|rtranif1|tran|tranif0|tranif1|assign|deassign|defparam|design|default|instance|disable|force|genvar|release|event|wait|specparam|edge|showcancelled|noshowcancelled|pulsestyle_oneventglitch|pulsestyle_ondetectglitch|input|output|inout|int|logic|string|integer|real|realtime|reg|time|wire|supply0|supply1|tri|triand|trior|tri0|tri1|wand|wor|trireg|struct|begin|end|if|else|initial|always|for|while|do|repeat|forever|ifnone|repeat|always_comb|always_ff|always_latch|localparam|parameter|module|macromodule|endmodule|function|task|fork|case|casex|casez|generate|config|primitive|specify|table|task|join|case|casex|casez|endcase|endgenerate|endconfig|endprimitive|endspecify|endtable|endtask|automatic|cell|begin|end|struct)\\b([a-zA-Z0-9_]+){1}\\s+(\\#\\([^\\)]+\\))?\\s*([a-zA-Z0-9_]+){1}\\s*(\\([^\\;]+\\))?\\s*\\;");
 
 
 #endif //HLSPY_DEFINITIONS_H

@@ -8,6 +8,7 @@
 #include <cctype>
 #include <regex>
 #include <sys/stat.h>
+#include <sstream>
 
 // Function to count occurrences of a certain pattern in string
 int string_count(std::string mainStr, std::regex pattern){
@@ -73,7 +74,17 @@ bool startsWith(const std::string& str, const std::string& prefix)
     return str.size() >= prefix.size() && 0 == str.compare(0, prefix.size(), prefix);
 }
 
-
+std::vector<std::string> stringSplit(const std::string& s, char delimiter)
+{
+    std::vector<std::string> tokens;
+    std::string token;
+    std::istringstream tokenStream(s);
+    while (std::getline(tokenStream, token, delimiter))
+    {
+        tokens.push_back(token);
+    }
+    return tokens;
+}
 
 // This function was obtained from: https://stackoverflow.com/questions/12774207/fastest-way-to-check-if-a-file-exist-using-standard-c-c11-c
 bool file_exists (const std::string& name) {

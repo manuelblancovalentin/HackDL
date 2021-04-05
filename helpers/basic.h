@@ -39,6 +39,8 @@ bool endsWith(const std::string& str, const std::string& suffix);
 
 bool startsWith(const std::string& str, const std::string& prefix);
 
+std::vector<std::string> stringSplit(const std::string& s, char delimiter);
+
 
 // This helps us check if an object is isntance of class or not
 template<typename Base, typename T>

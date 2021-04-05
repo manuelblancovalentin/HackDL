@@ -13,6 +13,9 @@
 
 #include <chrono>
 #include <filesystem>
+#include <algorithm>
+#include <string>
+#include <regex>
 
 
 // Parse file
@@ -97,6 +100,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
     std::string line;
     std::string message;
     bool force_print = false;
+    std::smatch match_pattern;
 
     // Init holders for verilog objects (netwires, ports, etc.)
     struct Ports ports = {{},
@@ -154,6 +158,16 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
 
         // If empty string, go to next line
         if (line == "") continue;
+
+        if (LineChecker(line, {"typedef"},1)) {
+            // Remove typedef
+            std::size_t pos = line.find("typedef ");
+            if (pos != std::string::npos) {
+                pos += 8;
+                line = line.substr(pos);
+            }
+
+        }
 
         // Check different options
         if (stringStartsWith(line, "//")) {
@@ -329,408 +343,535 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                         "Something went wrong while parsing block comment (we never found closing brackets). Raising error.");
             }
 
-        } else if (stringStartsWith(line, "endmodule")) {
-            // We found end of module definition, wrap things up and exit function
-            break;
+        } else {
 
-            // Module|Macromodule Definition
-        } else if (LineChecker(line, __VLOG_MODULE_NAMES__, __VLOG_NUM_MODULE_NAMES__)) {
+            // Here there's a check we have to perform before parsing the specific type of string.
+            // We gotta look how many non-nestable blocks we have in our line so far.
+            // As their name suggests, non-nestable blocks cannot be nested, which means that in case
+            // this line contains more than one non-nestable blocks, we'll have to divide this first.
+            // This is a consequence of verilog/systemverilog not having a consistent way to declare blocks
+            // a.k.a, you can declare a block in between begin/end statements, or without them, or whatever.
+            // IEEE guys, fix this
 
-            // Make sure there's a ; in the definition
-            std::size_t semicolon_pos = line.find(';');
-            std::string post_semicolon = "";
+            // initialize next_line tmp var
+            std::string next_line = "";
 
-            if (semicolon_pos != std::string::npos) {
+            if (LineChecker(line, __VLOG_PATTERNS_NON_NESTABLE_KEYWORDS__, __VLOG_NUM_PATTERNS_NON_NESTABLE_KEYWORDS__)) {
 
-                // We found a module, so let's parse its content by recursively passing it to be
-                // __parse__ function
+                // Count number (n) of non-nestable (nn) statements (blocks)
+                int nnnblocks = string_count(line, __VLOG_REGEX_NON_NESTABLE_KEYWORDS__);
 
-                // first of all, let's get the name out of it
+                if (nnnblocks > 1){
+                    // Split. We will only parse the first statement (everything before the second non-nestable block)
+                    // The rest of it will be parsed later, in the next iteration
 
-                // Divide semicolon
-                post_semicolon = line.substr(semicolon_pos + 1);
-                line = line.substr(0, semicolon_pos);
+                    int iip = 0;
+                    for (std::sregex_iterator it = std::sregex_iterator(line.begin(), line.end(), __VLOG_REGEX_NON_NESTABLE_KEYWORDS__);
+                         it != std::sregex_iterator(); it++) {
+                        std::smatch match = *it;
 
-                // Trim
-                ltrim(post_semicolon);
-                rtrim(line);
+                        if (iip == 1){
+                            int cut = match.position(0);
+                            //next_line = line.substr(cut);
+                            //line = line.substr(0,cut);
+                            line = line.substr(cut);
+                            break;
+                        }
+                        iip++;
 
-                // Get module name and params
-                // Get rid of keyword "module"
-                std::size_t pos = line.find("module ");
-                pos += 7;
-                line = line.substr(pos);
-                ltrim(line);
-
-                // Now we can parse the name of the module
-                pos = line.find("(");
-                if (pos != std::string::npos) {
-                    // Try to find ;
-                    line = line.substr(0, pos);
-                } else {
-                    pos = line.find(";");
-                    line = line.substr(0, pos);
-                }
-
-                // What's left is simply the name of the module
-                std::string module_name = line;
-                trim(module_name);
-
-                // Print message before creating module
-                message = string_format("Module %s found from line %d to %d\n", module_name.c_str(),
-                                        start_line + line_offset, end_line + line_offset);
-                pbar.update(end_line, message, TAB);
-
-                std::string TAB_tmp = TAB + "\t";
-
-                // Pass stream to parser to process module content
-                VerilogBlock vlogtmp = Parser::__parse__(mod_defs_tmp, module_references_tmp,
-                                                         sources, lib,
-                                                         orphans_tmp,
-                                                            stream, pbar,
-                                                            start_line,
-                                                            ancestors_tmp,
-                                                            children_tmp,
-                                                            post_semicolon,
-                                                            TAB_tmp,
-                                                            module_name,
-                                                            "module");
-
-                // build subhierarchy before returning block
-                vlogtmp.__build_subhierarchy__(TAB_tmp);
-
-                // Push into mod_definitions
-                mod_defs_tmp.push_back(vlogtmp);
-                mod_defs_tmp_str.push_back(module_name);
-
-                //for (auto& mtp: vlogtmpmod.inner_modules) mod_defs_tmp.push_back(mtp);
-                for (auto& mtp: vlogtmp.inner_moddefs)
-                    if (find(mod_defs_tmp_str.begin(), mod_defs_tmp_str.end(), mtp) == mod_defs_tmp_str.end())
-                        mod_defs_tmp_str.push_back(mtp);
-                for (auto& mtp: vlogtmp.children)
-                    if (find(children_tmp.begin(), children_tmp.end(), mtp) == children_tmp.end())
-                        children_tmp.push_back(mtp);
-
-                // Module references maps
-                module_references_tmp.insert(std::pair<std::string,VerilogBlock>(module_name,vlogtmp));
-
-                if (find(children_tmp.begin(), children_tmp.end(), module_name) == children_tmp.end())
-                    children_tmp.push_back(module_name);
-
-
-                //mod_defs_tmp.push_back(&vlogtmpmod);
-                //children_tmp.push_back(module_name);
-                // Add to mod_defs
-                //mod_defs_tmp_str.push_back(module_name);
-
-                // Push into children
-                /*
-                for (auto& c: children) {
-                    if (std::find(children_tmp.begin(), children_tmp.end(), c) == children_tmp.end()){
-                        children_tmp.push_back(c);
+                        /*
+                        cout << "\nMatched  string is = " << match.str(0)
+                             << "\nand it is found at position "
+                             << match.position(0) << endl;
+                        cout << "Capture " << match.str(1)
+                             << " at position " << match.position(1) << endl;
+                        */
                     }
                 }
-                 */
-
-                // Setup lines
-                end_line = start_line;
-
-                // Clean tmp vars
-                prev_line = "";
-                line = "";
-
-                // Setup message
-                message = "";
-                force_print = false;
-
-            } else {
-                // Keep appending lines until we find a semicolon
-                prev_line = line;
-                line = "";
-                message = string_format("Appending data from line %d to Module declaration found at line %d",
-                                        end_line + line_offset, start_line + line_offset);
-
-            }
-
-            // Begin/End statement
-        } else if (LineChecker(line, __VLOG_PATTERNS_STATEMENTS__, __VLOG_NUM_PATTERNS_STATEMENTS__)) {
-
-            // The first thing we must do is calculate the number of opening and ending statements
-            // (that is, begin/ends). We have to keep appending lines until nbegins == nends.
-            // If for some reason we get at any point nends > nbegins, cancel this, as something went wrong.
-            int nbegins = string_count(line, __VLOG_BEGIN_REGEX__);
-            int nends = string_count(line, __VLOG_END_REGEX__);
-
-            if ((nbegins > nends)  || (nbegins == 0 && nends == 0)) {
-                // Append line and keep looking for rest of statements
-                prev_line = line;
-                line = "";
-                message = string_format(
-                        "Appending data from line %d to Begin/End Statement found previously at line %d",
-                        end_line + line_offset, start_line + line_offset);
-
-            } else if (nbegins == nends) {
-                prev_line = "";
-                line = "";
-
-                // Setup message
-                message = string_format("Begin/End statement found from line %d to %d (ignored)",
-                                        start_line + line_offset, end_line + line_offset);
-                force_print = true;
-
-                // Setup lines
-                start_line = end_line;
-
-            } else {
-                // Something went wrong, cause nends should NEVER be > nbegins, so let's just raise an exception here
-                throw std::invalid_argument("Number of END keywords in block surpasses the number of BEGIN "
-                                            "found, which is impossible. Raising error.");
             }
 
 
-            // Check if this is a netwire
-        } else if (LineChecker(line, __VLOG_PATTERNS_NETWIRES__, __VLOG_NUM_PATTERNS_NETWIRES__)) {
+            // Now check for everything
+            if (stringStartsWith(line, "endmodule")) {
+                // We found end of module definition, wrap things up and exit function
+                prev_line = next_line;
+                break;
 
-            /* Let's parse this bad boy now. The format for reg/wires/etc. in pseudo-regex is:
-            (input|output|inout)? (reg|wire|tri|integer|real|...)? ([<bit_size>])? <NAME> ([<array_size>])? (= <VALUE>)?
+                // Module|Macromodule Definition
+            } else if (LineChecker(line, __VLOG_MODULE_NAMES__, __VLOG_NUM_MODULE_NAMES__)) {
 
-            where "?" means optional arguments. So some examples would be:
+                // Make sure there's a ; in the definition
+                std::size_t semicolon_pos = line.find(';');
+                std::string post_semicolon = "";
 
-            input reg Q;
-            output wire D;
-            reg [2:0] Q = 0;
-            reg [2:0] Q [1:0];
-            input Q;
+                if (semicolon_pos != std::string::npos) {
 
-            */
+                    // We found a module, so let's parse its content by recursively passing it to be
+                    // __parse__ function
 
+                    // first of all, let's get the name out of it
 
-            // The first thing we must do is check if we can split this sentence into several statements
-            // separated by ;
-            std::size_t semicolon_pos = line.find(';');
-            std::string post_line = "";
-            if (semicolon_pos != std::string::npos) {
-                // Divide semicolon
-                post_line = line.substr(semicolon_pos + 1);
-                line = line.substr(0, semicolon_pos);
+                    // Divide semicolon
+                    post_semicolon = line.substr(semicolon_pos + 1);
+                    line = line.substr(0, semicolon_pos);
 
-                // First of all, check if port is specified (input/output/inout)
-                port_type = -1;
-                if (stringStartsWith(line, "input ")) {
-                    // Append this port to input
-                    // ports.inputs.push_back(name);
-                    port_type = 0;
-                    // Trim string to get rid of word "input " (with space)
-                    std::size_t pos = line.find("input ");
-                    pos += 6;
-                    line = line.substr(pos);
-                    ltrim(line);
+                    // Trim
+                    ltrim(post_semicolon);
+                    rtrim(line);
 
-                } else if (stringStartsWith(line, "output ")) {
-                    // Append this port to input
-                    // ports.outputs.push_back(name);
-                    port_type = 1;
-
-                    // Trim string to get rid of word "input " (with space)
-                    std::size_t pos = line.find("output ");
+                    // Get module name and params
+                    // Get rid of keyword "module"
+                    std::size_t pos = line.find("module ");
                     pos += 7;
                     line = line.substr(pos);
                     ltrim(line);
 
-                } else if (stringStartsWith(line, "inout ")) {
-                    // Append this port to input
-                    // ports.inouts.push_back(name);
-                    port_type = 2;
+                    // Now we can parse the name of the module
+                    pos = line.find("(");
+                    if (pos != std::string::npos) {
+                        // Try to find ;
+                        line = line.substr(0, pos);
+                    } else {
+                        pos = line.find(";");
+                        line = line.substr(0, pos);
+                    }
 
-                    // Trim string to get rid of word "input " (with space)
-                    std::size_t pos = line.find("inout ");
-                    pos += 6;
-                    line = line.substr(pos);
-                    ltrim(line);
-                }
+                    // What's left is simply the name of the module
+                    std::string module_name = line;
+                    trim(module_name);
 
-                // Check type of netwire
-                std::string type = "wire";
-                if (stringStartsWith(line, "integer ")) {
-                    type = "integer";
-                    // Trim string to get rid of word "integer " (with space)
-                    std::size_t pos = line.find("integer ");
-                    pos += 8;
-                    line = line.substr(pos);
-                    ltrim(line);
+                    // Print message before creating module
+                    message = string_format("Module %s found from line %d to %d\n", module_name.c_str(),
+                                            start_line + line_offset, end_line + line_offset);
+                    pbar.update(end_line, message, TAB);
 
-                } else if (stringStartsWith(line, "real ")) {
-                    type = "real";
-                    // Trim string to get rid of word "real " (with space)
-                    std::size_t pos = line.find("real ");
-                    pos += 5;
-                    line = line.substr(pos);
-                    ltrim(line);
+                    std::string TAB_tmp = TAB + "\t";
 
-                } else if (stringStartsWith(line, "realtime ")) {
-                    type = "realtime";
-                    // Trim string to get rid of word "realtime " (with space)
-                    std::size_t pos = line.find("realtime ");
-                    pos += 9;
-                    line = line.substr(pos);
-                    ltrim(line);
+                    // Pass stream to parser to process module content
+                    VerilogBlock vlogtmp = Parser::__parse__(mod_defs_tmp, module_references_tmp,
+                                                             sources, lib,
+                                                             orphans_tmp,
+                                                             stream, pbar,
+                                                             start_line,
+                                                             ancestors_tmp,
+                                                             children_tmp,
+                                                             post_semicolon,
+                                                             TAB_tmp,
+                                                             module_name,
+                                                             "module");
 
-                } else if (stringStartsWith(line, "reg ")) {
-                    type = "reg";
-                    // Trim string to get rid of word "reg " (with space)
-                    std::size_t pos = line.find("reg ");
-                    pos += 4;
-                    line = line.substr(pos);
-                    ltrim(line);
+                    // build subhierarchy before returning block
+                    vlogtmp.__build_subhierarchy__(TAB_tmp);
 
-                } else if (stringStartsWith(line, "time ")) {
-                    type = "time";
-                    // Trim string to get rid of word "time " (with space)
-                    std::size_t pos = line.find("time ");
-                    pos += 5;
-                    line = line.substr(pos);
-                    ltrim(line);
+                    // Push into mod_definitions
+                    mod_defs_tmp.push_back(vlogtmp);
+                    mod_defs_tmp_str.push_back(module_name);
 
-                } else if (stringStartsWith(line, "wire")) {
-                    type = "wire";
-                    // Trim string to get rid of word "wire " (with space)
-                    std::size_t pos = line.find("wire ");
-                    pos += 5;
-                    line = line.substr(pos);
-                    ltrim(line);
+                    //for (auto& mtp: vlogtmpmod.inner_modules) mod_defs_tmp.push_back(mtp);
+                    for (auto& mtp: vlogtmp.inner_moddefs)
+                        if (find(mod_defs_tmp_str.begin(), mod_defs_tmp_str.end(), mtp) == mod_defs_tmp_str.end())
+                            mod_defs_tmp_str.push_back(mtp);
+                    for (auto& mtp: vlogtmp.children)
+                        if (find(children_tmp.begin(), children_tmp.end(), mtp) == children_tmp.end())
+                            children_tmp.push_back(mtp);
 
-                } else if (stringStartsWith(line, "supply0 ")) {
-                    type = "supply0";
-                    // Trim string to get rid of word "supply0 " (with space)
-                    std::size_t pos = line.find("supply0 ");
-                    pos += 7;
-                    line = line.substr(pos);
-                    ltrim(line);
+                    // Module references maps
+                    module_references_tmp.insert(std::pair<std::string,VerilogBlock>(module_name,vlogtmp));
 
-                } else if (stringStartsWith(line, "supply1 ")) {
-                    type = "supply1";
-                    // Trim string to get rid of word "supply1 " (with space)
-                    std::size_t pos = line.find("supply1 ");
-                    pos += 7;
-                    line = line.substr(pos);
-                    ltrim(line);
+                    if (find(children_tmp.begin(), children_tmp.end(), module_name) == children_tmp.end())
+                        children_tmp.push_back(module_name);
 
-                } else if (stringStartsWith(line, "tri ")) {
-                    type = "tri";
-                    // Trim string to get rid of word "tri " (with space)
-                    std::size_t pos = line.find("tri ");
-                    pos += 4;
-                    line = line.substr(pos);
-                    ltrim(line);
 
-                } else if (stringStartsWith(line, "triand ")) {
-                    type = "triand";
-                    // Trim string to get rid of word "triand " (with space)
-                    std::size_t pos = line.find("triand ");
-                    pos += 7;
-                    line = line.substr(pos);
-                    ltrim(line);
+                    //mod_defs_tmp.push_back(&vlogtmpmod);
+                    //children_tmp.push_back(module_name);
+                    // Add to mod_defs
+                    //mod_defs_tmp_str.push_back(module_name);
 
-                } else if (stringStartsWith(line, "trior ")) {
-                    type = "trior";
-                    // Trim string to get rid of word "trior " (with space)
-                    std::size_t pos = line.find("trior ");
-                    pos += 6;
-                    line = line.substr(pos);
-                    ltrim(line);
+                    // Push into children
+                    /*
+                    for (auto& c: children) {
+                        if (std::find(children_tmp.begin(), children_tmp.end(), c) == children_tmp.end()){
+                            children_tmp.push_back(c);
+                        }
+                    }
+                     */
 
-                } else if (stringStartsWith(line, "tri0 ")) {
-                    type = "tri0";
-                    // Trim string to get rid of word "tri0 " (with space)
-                    std::size_t pos = line.find("tri0 ");
-                    pos += 5;
-                    line = line.substr(pos);
-                    ltrim(line);
+                    // Setup lines
+                    end_line = start_line;
 
-                } else if (stringStartsWith(line, "tri1 ")) {
-                    type = "tri1";
-                    // Trim string to get rid of word "tri0 " (with space)
-                    std::size_t pos = line.find("tri1 ");
-                    pos += 5;
-                    line = line.substr(pos);
-                    ltrim(line);
+                    // Clean tmp vars
+                    prev_line = next_line;
+                    line = "";
 
-                } else if (stringStartsWith(line, "wand ")) {
-                    type = "wand";
-                    // Trim string to get rid of word "wand " (with space)
-                    std::size_t pos = line.find("wand ");
-                    pos += 5;
-                    line = line.substr(pos);
-                    ltrim(line);
-
-                } else if (stringStartsWith(line, "wor ")) {
-                    type = "wor";
-                    // Trim string to get rid of word "wor " (with space)
-                    std::size_t pos = line.find("wor ");
-                    pos += 4;
-                    line = line.substr(pos);
-                    ltrim(line);
+                    // Setup message
+                    message = "";
+                    force_print = false;
 
                 } else {
-                    type = "wire";
-                    // We don't have to trim anything here
+                    // Keep appending lines until we find a semicolon
+                    prev_line = line + next_line;
+                    line = "";
+                    message = string_format("Appending data from line %d to Module declaration found at line %d",
+                                            end_line + line_offset, start_line + line_offset);
+
                 }
 
-                // Now let's check if we have the bitspan
-                std::string bitspan = "[0:0]";
-                if (stringStartsWith(line, "[")) {
-                    std::size_t pos = line.find("]");
-                    pos += 1;
-                    bitspan = line.substr(0, pos);
+                // Begin/End statement
+            } else if (LineChecker(line, __VLOG_PATTERNS_STATEMENTS__, __VLOG_NUM_PATTERNS_STATEMENTS__)) {
 
-                    // Now trim bitspan
-                    line = line.substr(pos);
+                // The first thing we must do is calculate the number of opening and ending statements
+                // (that is, begin/ends). We have to keep appending lines until nbegins == nends.
+                // If for some reason we get at any point nends > nbegins, cancel this, as something went wrong.
+                int nbegins = string_count(line, __VLOG_BEGIN_REGEX__);
+                int nends = string_count(line, __VLOG_END_REGEX__);
+
+                // SystemVerilog in this sense is a bit annoying because it allows you to declare statements repeatedly
+                // without actually using "begin/end". This means we not only have to look for begin/end structures, but
+                // also for any new keyword that might define a new block. This includes instances, which is crazy,
+                // because right now we only assume a structure is an instance if we were not able to assign it to
+                // anything else.
+
+                if ((nbegins > nends)  || (nbegins == 0 && nends == 0)) {
+                    // Append line and keep looking for rest of statements
+                    prev_line = line + next_line;
+                    line = "";
+                    message = string_format(
+                            "Appending data from line %d to Begin/End Statement found previously at line %d",
+                            end_line + line_offset, start_line + line_offset);
+
+                } else if (nbegins == nends) {
+                    prev_line = next_line;
+                    line = "";
+
+                    // Setup message
+                    message = string_format("Begin/End statement found from line %d to %d (ignored)",
+                                            start_line + line_offset, end_line + line_offset);
+                    force_print = true;
+
+                    // Setup lines
+                    start_line = end_line;
+
+                } else {
+                    // Something went wrong, cause nends should NEVER be > nbegins, so let's just raise an exception here
+                    throw std::invalid_argument("Number of END keywords in block surpasses the number of BEGIN "
+                                                "found, which is impossible. Raising error.");
+                }
+
+
+                // Check if this is a netwire
+            } else if (LineChecker(line, __VLOG_PATTERNS_NETWIRES__, __VLOG_NUM_PATTERNS_NETWIRES__)) {
+
+                /* Let's parse this bad boy now. The format for reg/wires/etc. in pseudo-regex is:
+                (input|output|inout)? (reg|wire|tri|integer|real|...)? ([<bit_size>])? <NAME> ([<array_size>])? (= <VALUE>)?
+
+                where "?" means optional arguments. So some examples would be:
+
+                input reg Q;
+                output wire D;
+                reg [2:0] Q = 0;
+                reg [2:0] Q [1:0];
+                input Q;
+
+                */
+
+
+                // The first thing we must do is check if we can split this sentence into several statements
+                // separated by ;
+                std::size_t semicolon_pos = line.find(';');
+                std::string post_line = "";
+                if (semicolon_pos != std::string::npos) {
+                    // Divide semicolon
+                    post_line = line.substr(semicolon_pos + 1);
+                    line = line.substr(0, semicolon_pos);
+
+                    // First of all, check if port is specified (input/output/inout)
+                    port_type = -1;
+                    if (stringStartsWith(line, "input ")) {
+                        // Append this port to input
+                        // ports.inputs.push_back(name);
+                        port_type = 0;
+                        // Trim string to get rid of word "input " (with space)
+                        std::size_t pos = line.find("input ");
+                        pos += 6;
+                        line = line.substr(pos);
+                        ltrim(line);
+
+                    } else if (stringStartsWith(line, "output ")) {
+                        // Append this port to input
+                        // ports.outputs.push_back(name);
+                        port_type = 1;
+
+                        // Trim string to get rid of word "input " (with space)
+                        std::size_t pos = line.find("output ");
+                        pos += 7;
+                        line = line.substr(pos);
+                        ltrim(line);
+
+                    } else if (stringStartsWith(line, "inout ")) {
+                        // Append this port to input
+                        // ports.inouts.push_back(name);
+                        port_type = 2;
+
+                        // Trim string to get rid of word "input " (with space)
+                        std::size_t pos = line.find("inout ");
+                        pos += 6;
+                        line = line.substr(pos);
+                        ltrim(line);
+                    }
+
+                    // Check type of netwire
+                    std::string type = "wire";
+                    if (stringStartsWith(line, "integer")) {
+                        type = "integer";
+                        // Trim string to get rid of word "integer " (with space)
+                        std::size_t pos = line.find("integer ");
+                        pos += 8;
+                        line = line.substr(pos);
+                        ltrim(line);
+
+                    } else if (stringStartsWith(line, "real")) {
+                        type = "real";
+                        // Trim string to get rid of word "real " (with space)
+                        std::size_t pos = line.find("real ");
+                        pos += 5;
+                        line = line.substr(pos);
+                        ltrim(line);
+
+                    } else if (stringStartsWith(line, "realtime")) {
+                        type = "realtime";
+                        // Trim string to get rid of word "realtime " (with space)
+                        std::size_t pos = line.find("realtime ");
+                        pos += 9;
+                        line = line.substr(pos);
+                        ltrim(line);
+
+                    } else if (stringStartsWith(line, "reg")) {
+                        type = "reg";
+                        // Trim string to get rid of word "reg " (with space)
+                        std::size_t pos = line.find("reg ");
+                        pos += 4;
+                        line = line.substr(pos);
+                        ltrim(line);
+
+                    } else if (stringStartsWith(line, "time")) {
+                        type = "time";
+                        // Trim string to get rid of word "time " (with space)
+                        std::size_t pos = line.find("time ");
+                        pos += 5;
+                        line = line.substr(pos);
+                        ltrim(line);
+
+                    } else if (stringStartsWith(line, "wire")) {
+                        type = "wire";
+                        // Trim string to get rid of word "wire " (with space)
+                        std::size_t pos = line.find("wire ");
+                        pos += 5;
+                        line = line.substr(pos);
+                        ltrim(line);
+
+                    } else if (stringStartsWith(line, "supply0")) {
+                        type = "supply0";
+                        // Trim string to get rid of word "supply0 " (with space)
+                        std::size_t pos = line.find("supply0 ");
+                        pos += 7;
+                        line = line.substr(pos);
+                        ltrim(line);
+
+                    } else if (stringStartsWith(line, "supply1")) {
+                        type = "supply1";
+                        // Trim string to get rid of word "supply1 " (with space)
+                        std::size_t pos = line.find("supply1 ");
+                        pos += 7;
+                        line = line.substr(pos);
+                        ltrim(line);
+
+                    } else if (stringStartsWith(line, "tri")) {
+                        type = "tri";
+                        // Trim string to get rid of word "tri " (with space)
+                        std::size_t pos = line.find("tri ");
+                        pos += 4;
+                        line = line.substr(pos);
+                        ltrim(line);
+
+                    } else if (stringStartsWith(line, "triand")) {
+                        type = "triand";
+                        // Trim string to get rid of word "triand " (with space)
+                        std::size_t pos = line.find("triand ");
+                        pos += 7;
+                        line = line.substr(pos);
+                        ltrim(line);
+
+                    } else if (stringStartsWith(line, "trior")) {
+                        type = "trior";
+                        // Trim string to get rid of word "trior " (with space)
+                        std::size_t pos = line.find("trior ");
+                        pos += 6;
+                        line = line.substr(pos);
+                        ltrim(line);
+
+                    } else if (stringStartsWith(line, "tri0")) {
+                        type = "tri0";
+                        // Trim string to get rid of word "tri0 " (with space)
+                        std::size_t pos = line.find("tri0 ");
+                        pos += 5;
+                        line = line.substr(pos);
+                        ltrim(line);
+
+                    } else if (stringStartsWith(line, "tri1")) {
+                        type = "tri1";
+                        // Trim string to get rid of word "tri0 " (with space)
+                        std::size_t pos = line.find("tri1 ");
+                        pos += 5;
+                        line = line.substr(pos);
+                        ltrim(line);
+
+                    } else if (stringStartsWith(line, "wand")) {
+                        type = "wand";
+                        // Trim string to get rid of word "wand " (with space)
+                        std::size_t pos = line.find("wand ");
+                        pos += 5;
+                        line = line.substr(pos);
+                        ltrim(line);
+
+                    } else if (stringStartsWith(line, "wor")) {
+                        type = "wor";
+                        // Trim string to get rid of word "wor " (with space)
+                        std::size_t pos = line.find("wor ");
+                        pos += 4;
+                        line = line.substr(pos);
+                        ltrim(line);
+
+                    } else if (stringStartsWith(line, "int")) {
+                        type = "int";
+                        // Trim string to get rid of word "int " (with space)
+                        std::size_t pos = line.find("int ");
+                        pos += 4;
+                        line = line.substr(pos);
+                        ltrim(line);
+
+                    } else if (stringStartsWith(line, "logic")) {
+                        type = "logic";
+                        // Trim string to get rid of word "logic " (with space)
+                        std::size_t pos = line.find("logic ");
+                        pos += 6;
+                        line = line.substr(pos);
+                        ltrim(line);
+
+                    }
+                    else if (stringStartsWith(line, "string")) {
+                        type = "string";
+                        // Trim string to get rid of word "logic " (with space)
+                        std::size_t pos = line.find("string ");
+                        pos += 7;
+                        line = line.substr(pos);
+                        ltrim(line);
+
+                    }
+                    else {
+                        type = "wire";
+                        // We don't have to trim anything here
+                    }
+
+                    // Now let's check if we have the bitspan
+                    std::string bitspan = "[0:0]";
+                    if (stringStartsWith(line, "[")) {
+                        std::size_t pos = line.find("]");
+                        pos += 1;
+                        bitspan = line.substr(0, pos);
+
+                        // Now trim bitspan
+                        line = line.substr(pos);
+                        ltrim(line);
+
+                    }
+
+                    // Before we get the names, we will try to get the value
+                    std::size_t pos = line.find('=');
+                    std::string value;
+                    if (pos != std::string::npos) {
+                        // There is a value definition, let's parse it now
+                        value = line.substr(pos+1);
+                        // Trim value from line definition
+                        line = line.substr(0, pos);
+                        rtrim(line);
+                        ltrim(line);
+                        std::replace( line.begin(), line.end(), '\"', '\'');
+                        rtrim(value);
+                        ltrim(value);
+                        std::replace(value.begin(), value.end(), '\"', '\'');
+
+                    }
+
+                    // Now we can try to get the array span, in case it exists
+                    std::string arrayspan = "[0:0]";
+                    std::size_t pos_bracket = line.find('[');
+                    if (pos_bracket != std::string::npos) {
+                        // Get arrayspan
+                        arrayspan = line.substr(pos_bracket);
+
+                        // Now trim arrayspan from line
+                        line = line.substr(0, pos_bracket);
+                        rtrim(line);
+                    }
+
+                    // Now we have everything that might define this group of netwires.
+                    // The only problem now is that each definition of netwire might be
+                    // declared in the same statement, separated by commas (something like
+                    // reg clk, a,  b,c,d; (notice the different number of spaces, etc)
+                    // So we must parse this taking that into consideration and initialize
+                    // a NetWire object (struct) for each instance.
+                    // Make sure we first trim line
                     ltrim(line);
 
-                }
+                    // Initialize array of NetWires
+                    std::string names_msg;
+                    bool first_time = true;
+                    // Store beginning and end of sentences
+                    std::string::const_iterator start = line.begin();
+                    std::string::const_iterator end = line.end();
+                    std::string::const_iterator next = std::find(start, end, ',');
+                    std::string name;
+                    // Loop thru all splits until we find end of line
+                    while (next != end) {
+                        // Get name
+                        name = std::string(start, next);
 
-                // Before we get the names, we will try to get the value
-                std::size_t pos = line.find('=');
-                std::string value;
-                if (pos != std::string::npos) {
-                    // There is a value definition, let's parse it now
-                    value = line.substr(pos);
-                    // Trim value from line definition
-                    line = line.substr(0, pos);
-                    rtrim(line);
-                }
+                        // Make sure to trim name
+                        trim(name);
 
-                // Now we can try to get the array span, in case it exists
-                std::string arrayspan = "[0:0]";
-                std::size_t pos_bracket = line.find('[');
-                if (pos_bracket != std::string::npos) {
-                    // Get arrayspan
-                    arrayspan = line.substr(pos_bracket);
+                        // Add to names_msg so we display this in our message later
+                        if (first_time)
+                            names_msg = name;
+                        else
+                            names_msg += ", " + name;
 
-                    // Now trim arrayspan from line
-                    line = line.substr(0, pos_bracket);
-                    rtrim(line);
-                }
+                        first_time = false;
 
-                // Now we have everything that might define this group of netwires.
-                // The only problem now is that each definition of netwire might be
-                // declared in the same statement, separated by commas (something like
-                // reg clk, a,  b,c,d; (notice the different number of spaces, etc)
-                // So we must parse this taking that into consideration and initialize
-                // a NetWire object (struct) for each instance.
-                // Make sure we first trim line
-                ltrim(line);
+                        // Now Init Netwire object
+                        NetWire nw = {name, type, bitspan, arrayspan, value};
+                        netwires.push_back(nw);
 
-                // Initialize array of NetWires
-                std::string names_msg;
-                bool first_time = true;
-                // Store beginning and end of sentences
-                std::string::const_iterator start = line.begin();
-                std::string::const_iterator end = line.end();
-                std::string::const_iterator next = std::find(start, end, ',');
-                std::string name;
-                // Loop thru all splits until we find end of line
-                while (next != end) {
+                        // Check if we have to append this to ports
+                        switch (port_type) {
+                            case 0:
+                                ports.input.push_back(name);
+                                break;
+                            case 1:
+                                ports.output.push_back(name);
+                                break;
+                            case 2:
+                                ports.inout.push_back(name);
+                                break;
+                        }
+
+                        // Increase start
+                        start = next + 1;
+
+                        // Find next
+                        next = std::find(start, end, ',');
+                    }
+
+                    // Last element
                     // Get name
                     name = std::string(start, next);
 
@@ -742,8 +883,6 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                         names_msg = name;
                     else
                         names_msg += ", " + name;
-
-                    first_time = false;
 
                     // Now Init Netwire object
                     NetWire nw = {name, type, bitspan, arrayspan, value};
@@ -762,113 +901,102 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                             break;
                     }
 
-                    // Increase start
-                    start = next + 1;
+                    // Setup message
+                    message = string_format("%s(s) (%s) %s %s found at line %d\n", type.c_str(),
+                                            names_msg.c_str(), bitspan.c_str(), arrayspan.c_str(), end_line + line_offset);
+                    force_print = true;
 
-                    // Find next
-                    next = std::find(start, end, ',');
-                }
+                    // Assign post_line to line
+                    line = post_line + next_line;
+                    prev_line = "";
 
-                // Last element
-                // Get name
-                name = std::string(start, next);
-
-                // Make sure to trim name
-                trim(name);
-
-                // Add to names_msg so we display this in our message later
-                if (first_time)
-                    names_msg = name;
-                else
-                    names_msg += ", " + name;
-
-                // Now Init Netwire object
-                NetWire nw = {name, type, bitspan, arrayspan, value};
-                netwires.push_back(nw);
-
-                // Check if we have to append this to ports
-                switch (port_type) {
-                    case 0:
-                        ports.input.push_back(name);
-                        break;
-                    case 1:
-                        ports.output.push_back(name);
-                        break;
-                    case 2:
-                        ports.inout.push_back(name);
-                        break;
-                }
-
-                // Setup message
-                message = string_format("%s(s) (%s) %s %s found at line %d\n", type.c_str(),
-                                        names_msg.c_str(), bitspan.c_str(), arrayspan.c_str(), end_line + line_offset);
-                force_print = true;
-
-                // Assign post_line to line
-                line = post_line;
-                prev_line = "";
-
-            } else {
-                // We need to keep appending lines until we find a semicolon
-                prev_line = line;
-                line = "";
-                message = string_format("Appending data to netwires statement found at line %d",
-                                        end_line + line_offset);
-            }
-
-            // Check if this is a parameter definition
-        } else if (LineChecker(line, __VLOG_PATTERNS_PARAMS__, __VLOG_NUM_PATTERNS_PARAMS__)) {
-
-            // The first thing we must do is check if we can split this sentence into several statements
-            // separated by ;
-            std::size_t semicolon_pos = line.find(';');
-            std::string post_line;
-            if (semicolon_pos != std::string::npos) {
-                // Separate post_line first
-                post_line = line.substr(semicolon_pos + 1);
-                line = line.substr(0, semicolon_pos);
-
-                // Trim keyword parameter/localparameter
-                std::size_t pos = line.find("parameter ");
-                if (pos != std::string::npos) {
-                    pos += 10;
-                    line = line.substr(pos);
                 } else {
-                    pos = line.find("localparam ");
+                    // We need to keep appending lines until we find a semicolon
+                    prev_line = line + next_line;
+                    line = "";
+                    message = string_format("Appending data to netwires statement found at line %d",
+                                            end_line + line_offset);
+                }
+
+                // Check if this is a parameter definition
+            } else if (LineChecker(line, __VLOG_PATTERNS_PARAMS__, __VLOG_NUM_PATTERNS_PARAMS__)) {
+
+                // The first thing we must do is check if we can split this sentence into several statements
+                // separated by ;
+                std::size_t semicolon_pos = line.find(';');
+                std::string post_line;
+                if (semicolon_pos != std::string::npos) {
+                    // Separate post_line first
+                    post_line = line.substr(semicolon_pos + 1);
+                    line = line.substr(0, semicolon_pos);
+
+                    // Trim keyword parameter/localparameter
+                    std::size_t pos = line.find("parameter ");
                     if (pos != std::string::npos) {
-                        pos += 11;
+                        pos += 10;
                         line = line.substr(pos);
+                    } else {
+                        pos = line.find("localparam ");
+                        if (pos != std::string::npos) {
+                            pos += 11;
+                            line = line.substr(pos);
+                        }
                     }
-                }
 
-                // Trim line
-                ltrim(line);
+                    // Trim line
+                    ltrim(line);
 
-                // Now parse value of parameters
-                pos = line.find('=');
-                std::string value;
-                if (pos != std::string::npos) {
-                    // There is a value definition, let's parse it now
-                    value = line.substr(pos);
-                    // Trim value from line definition
-                    line = line.substr(0, pos);
-                    rtrim(line);
-                }
+                    // Now parse value of parameters
+                    pos = line.find('=');
+                    std::string value;
+                    if (pos != std::string::npos) {
+                        // There is a value definition, let's parse it now
+                        value = line.substr(pos);
+                        // Trim value from line definition
+                        line = line.substr(0, pos);
+                        rtrim(line);
+                    }
 
-                // Now parse all the names
-                // Make sure we first trim line
-                ltrim(line);
+                    // Now parse all the names
+                    // Make sure we first trim line
+                    ltrim(line);
 
-                // Initialize array of parameters
-                std::string names_msg;
-                bool first_time = true;
-                // Store beginning and end of sentences
-                std::string::const_iterator start = line.begin();
-                std::string::const_iterator end = line.end();
-                std::string::const_iterator next = std::find(start, end, ',');
-                std::string name;
-                // Loop thru all splits until we find end of line
-                while (next != end) {
+                    // Initialize array of parameters
+                    std::string names_msg;
+                    bool first_time = true;
+                    // Store beginning and end of sentences
+                    std::string::const_iterator start = line.begin();
+                    std::string::const_iterator end = line.end();
+                    std::string::const_iterator next = std::find(start, end, ',');
+                    std::string name;
+                    // Loop thru all splits until we find end of line
+                    while (next != end) {
+                        // Get name
+                        name = std::string(start, next);
+
+                        // Make sure to trim name
+                        trim(name);
+
+                        // Add to names_msg so we display this in our message later
+                        if (first_time)
+                            names_msg = name;
+                        else
+                            names_msg += ", " + name;
+
+                        first_time = false;
+
+                        // Now Init Netwire object
+                        Parameter par = {name, value};
+                        parameters.push_back(par);
+
+                        // Increase start
+                        start = next + 1;
+
+                        // Find next
+                        next = std::find(start, end, ',');
+                    }
+
+                    // Find last one
                     // Get name
                     name = std::string(start, next);
 
@@ -887,218 +1015,231 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                     Parameter par = {name, value};
                     parameters.push_back(par);
 
-                    // Increase start
-                    start = next + 1;
+                    // Setup message
+                    message = string_format("Parameter(s) (%s) found at line %d\n",
+                                            names_msg.c_str(), end_line + line_offset);
+                    force_print = true;
 
-                    // Find next
-                    next = std::find(start, end, ',');
+                    // Assign post_line to line
+                    line = post_line + next_line;
+                    prev_line = "";
+
+                } else {
+                    // We need to keep appending lines until we find a semicolon
+                    prev_line = line + next_line;
+                    line = "";
+                    message = string_format("Appending data to parameter statement found at line %d",
+                                            end_line + line_offset);
                 }
 
-                // Find last one
-                // Get name
-                name = std::string(start, next);
+                // Check if this is an assign statement (which we will ignore)
+            } else if (LineChecker(line, __VLOG_SEMICOLON_STATEMENTS__, __VLOG_NUM_SEMICOLON_STATEMENTS__)) {
 
-                // Make sure to trim name
-                trim(name);
+                // The first thing we must do is check if we can split this sentence into several statements
+                // separated by ;
+                std::size_t semicolon_pos = line.find(';');
+                std::string post_line;
+                if (semicolon_pos != std::string::npos) {
+                    // Separate post_line first
+                    prev_line = line.substr(semicolon_pos + 1) + next_line;
+                    line = "";
 
-                // Add to names_msg so we display this in our message later
-                if (first_time)
-                    names_msg = name;
-                else
-                    names_msg += ", " + name;
+                    // Setup message
+                    message = string_format("General statement found at line %d ignored", end_line + line_offset);
+                    force_print = false;
 
-                first_time = false;
-
-                // Now Init Netwire object
-                Parameter par = {name, value};
-                parameters.push_back(par);
-
-                // Setup message
-                message = string_format("Parameter(s) (%s) found at line %d\n",
-                                        names_msg.c_str(), end_line + line_offset);
-                force_print = true;
-
-                // Assign post_line to line
-                line = post_line;
-                prev_line = "";
-
-            } else {
-                // We need to keep appending lines until we find a semicolon
-                prev_line = line;
-                line = "";
-                message = string_format("Appending data to parameter statement found at line %d",
-                                        end_line + line_offset);
-            }
-
-
-            // Check if this is an assign statement (which we will ignore)
-        } else if (LineChecker(line, __VLOG_SEMICOLON_STATEMENTS__, __VLOG_NUM_SEMICOLON_STATEMENTS__)) {
-
-            // The first thing we must do is check if we can split this sentence into several statements
-            // separated by ;
-            std::size_t semicolon_pos = line.find(';');
-            std::string post_line;
-            if (semicolon_pos != std::string::npos) {
-                // Separate post_line first
-                prev_line = line.substr(semicolon_pos + 1);
-                line = "";
-
-                // Setup message
-                message = string_format("General statement found at line %d ignored", end_line + line_offset);
-                force_print = false;
-
-            } else {
-                // We need to keep appending lines until we find a semicolon
-                prev_line = line;
-                line = "";
-                message = string_format("Appending data to Statement found at line %d", end_line + line_offset);
-            }
-
-            // Check if this is a function definition
-        } else if (LineChecker(line, __VLOG_GROUPS__, __VLOG_NUM_GROUPS__)) {
-
-            // The first thing we must do is calculate the number of opening and ending statements
-            // (that is, begin/ends). We have to keep appending lines until nbegins == nends.
-            // If for some reason we get at any point nends > nbegins, cancel this, as something went wrong.
-
-            // Initialize variable used to check if all statements have been closed
-            bool statements_open = false;
-            bool statements_error = false;
-
-            int nbegins_function = string_count(line, __VLOG_FUNCTION_REGEX__);
-            int nends_function = string_count(line, __VLOG_ENDFUNCTION_REGEX__);
-            statements_open |= (nbegins_function > nends_function) || (nbegins_function == 0 && nends_function == 0);
-            statements_error |= (nbegins_function < nends_function);
-
-            // Task begin/ends
-            int nbegins_task = string_count(line, __VLOG_TASK_REGEX__);
-            int nends_task = string_count(line, __VLOG_ENDTASK_REGEX__);
-            statements_open |= (nbegins_task > nends_task) || (nbegins_task == 0 && nends_task == 0);
-            statements_error |= (nbegins_task < nends_task);
-
-            // Fork begins/ends
-            int nbegins_fork = string_count(line, __VLOG_FORK_REGEX__);
-            int nends_fork = string_count(line, __VLOG_JOIN_REGEX__);
-            statements_open |= (nbegins_fork > nends_fork) || (nbegins_fork == 0 && nends_fork == 0);
-            statements_error |= (nbegins_fork < nends_fork);
-
-            // Case(X|Z) begins/ends
-            int nbegins_case = string_count(line, __VLOG_CASE_REGEX__) +
-                                  string_count(line, __VLOG_CASEX_REGEX__) +
-                                  string_count(line, __VLOG_CASEZ_REGEX__);
-            int nends_case = string_count(line, __VLOG_ENDCASE_REGEX__);
-            statements_open |= (nbegins_case > nends_case) || (nbegins_case == 0 && nends_case == 0);
-            statements_error |= (nbegins_case < nends_case);
-
-            // Generate begins/ends
-            int nbegins_generate = string_count(line, __VLOG_GENERATE_REGEX__);
-            int nends_generate = string_count(line, __VLOG_ENDGENERATE_REGEX__);
-            statements_open |= (nbegins_generate > nends_generate) || (nbegins_generate == 0 && nends_generate == 0);
-            statements_error |= (nbegins_generate < nends_generate);
-
-            // Config begins/ends
-            int nbegins_config = string_count(line, __VLOG_CONFIG_REGEX__);
-            int nends_config = string_count(line, __VLOG_ENDCONFIG_REGEX__);
-            statements_open |= (nbegins_config > nends_config) || (nbegins_config == 0 && nends_config == 0);
-            statements_error |= (nbegins_config < nends_config);
-
-            // Primitive begins/ends
-            int nbegins_primitives = string_count(line, __VLOG_PRIMITIVE_REGEX__);
-            int nends_primitives = string_count(line, __VLOG_ENDPRIMITIVE_REGEX__);
-            statements_open |= (nbegins_primitives > nends_primitives) || (nbegins_primitives == 0 && nends_primitives == 0);
-            statements_error |= (nbegins_primitives < nends_primitives);
-
-            // Specify begins/ends
-            int nbegins_specify = string_count(line, __VLOG_SPECIFY_REGEX__);
-            int nends_specify = string_count(line, __VLOG_ENDSPECIFY_REGEX__);
-            statements_open |= (nbegins_specify > nends_specify) || (nbegins_specify == 0 && nends_specify == 0);
-            statements_error |= (nbegins_specify < nends_specify);
-
-            // Table begins/ends
-            int nbegins_table = string_count(line, __VLOG_TABLE_REGEX__);
-            int nends_table = string_count(line, __VLOG_ENDTABLE_REGEX__);
-            statements_open |= (nbegins_table > nends_table) || (nbegins_table == 0 && nends_table == 0);
-            statements_error |= (nbegins_table < nends_table);
-
-            // Check if there's any open nested statement
-            if (statements_open) {
-                // This means that at least one statement is still open, so let's keep appending lines
-                prev_line = line;
-                line = "";
-                message = string_format(
-                        "Appending data from line %d to Statement found previously at line %d",
-                        end_line + line_offset, start_line + line_offset);
-
-            } else if (statements_error) {
-                // Something went wrong, cause nends should NEVER be > nbegins, so let's just raise an exception here
-                throw std::invalid_argument("Number of ENDS keywords in block surpasses the number of BEGINS "
-                                            "found, which is impossible. Raising error.");
-            } else {
-                // Then all statements have been properly closed, so let's wrap this up
-                prev_line = "";
-                line = "";
-
-                // Setup message
-                message = string_format("Statement found from line %d to %d (ignored)",
-                                        start_line + line_offset, end_line + line_offset);
-                force_print = true;
-
-                // Setup lines
-                start_line = end_line;
-            }
-
-            // Check if this module instance (either primitive or not, it doesn't matter)
-        } else if (!LineChecker(line, __VLOG_ATTRIBUTES__, __VLOG_NUM_ATTRIBUTES__)) {
-
-            // The structure of an instance is as follows (? indicates optional):
-            // <MODULE_DEF or PRIMITIVE> #(<PARAM_LIST>)? <NAME> (<PORT_LIST>);
-            // So let's parse this bad boy
-
-            // First thing, make sure that this line ends with a semicolon. Otherwise, keep appending
-            // until we find a semicolon
-            std::size_t semicolon_pos = line.find(';');
-            std::string post_line;
-            if (semicolon_pos != std::string::npos) {
-
-                // Divide semicolon
-                post_line = line.substr(semicolon_pos + 1);
-                line = line.substr(0, semicolon_pos);
-
-                // The first part of the line will indicate the module_def of the instance
-                std::size_t space_pos = line.find(' ');
-                if (space_pos == std::string::npos){
-                    // instance has no module name? WTF? Throw exception
-                    throw std::invalid_argument("Something went wrong while parsing an instance (NO MODULE_REF FOUND). Raising error.");
+                } else {
+                    // We need to keep appending lines until we find a semicolon
+                    prev_line = line + next_line;
+                    line = "";
+                    message = string_format("Appending data to Statement found at line %d", end_line + line_offset);
                 }
-                std::string module_ref_name = line.substr(0,space_pos);
-                line = line.substr(space_pos+1);
-                // Trim
+
+
+                // Check if this is a typedef
+            } else if (stringStartsWith(line, "struct")) {
+
+                // The first thing we must do is check if we can split this sentence into several statements
+                // separated by ;
+                std::size_t semicolon_pos = line.find('}');
+                std::string post_line;
+                if (semicolon_pos != std::string::npos) {
+                    // Separate post_line first
+                    prev_line = line.substr(semicolon_pos + 1);
+
+                    std::smatch match;
+
+                    if (std::regex_search(line, match, __VLOG_STRUCT_PATTERN__))
+                    {
+                        std::string name = match[4];
+                    }
+
+                    post_line = line.substr(semicolon_pos + 1);
+                    std::size_t semicolon_pos = post_line.find(';');
+                    prev_line = post_line.substr(semicolon_pos + 1) + next_line;
+
+                    // Setup message
+                    message = string_format("Struct def found at line %d", end_line + line_offset);
+                    force_print = false;
+
+                } else {
+                    // We need to keep appending lines until we find a } character
+                    prev_line = line + next_line;
+                    line = "";
+                    message = string_format("Appending data to struct def found at line %d", end_line + line_offset);
+                }
+
+
+                // Check if this is a function definition
+            } else if (LineChecker(line, __VLOG_GROUPS__, __VLOG_NUM_GROUPS__)) {
+
+                // The first thing we must do is calculate the number of opening and ending statements
+                // (that is, begin/ends). We have to keep appending lines until nbegins == nends.
+                // If for some reason we get at any point nends > nbegins, cancel this, as something went wrong.
+
+                // Initialize variable used to check if all statements have been closed
+                bool statements_open = false;
+                bool statements_error = false;
+
+                int nbegins_function = string_count(line, __VLOG_FUNCTION_REGEX__);
+                int nends_function = string_count(line, __VLOG_ENDFUNCTION_REGEX__);
+                int nbegins_tot = nbegins_function;
+                int nends_tot = nends_function;
+                statements_open |= (nbegins_function > nends_function);
+                statements_error |= (nbegins_function < nends_function);
+
+                // Task begin/ends
+                int nbegins_task = string_count(line, __VLOG_TASK_REGEX__);
+                int nends_task = string_count(line, __VLOG_ENDTASK_REGEX__);
+                nbegins_tot += nbegins_task;
+                nends_tot += nends_task;
+                statements_open |= (nbegins_task > nends_task);
+                statements_error |= (nbegins_task < nends_task);
+
+                // Fork begins/ends
+                int nbegins_fork = string_count(line, __VLOG_FORK_REGEX__);
+                int nends_fork = string_count(line, __VLOG_JOIN_REGEX__);
+                nbegins_tot += nbegins_fork;
+                nends_tot += nends_fork;
+                statements_open |= (nbegins_fork > nends_fork);
+                statements_error |= (nbegins_fork < nends_fork);
+
+                // Case(X|Z) begins/ends
+                int nbegins_case = string_count(line, __VLOG_CASE_REGEX__) +
+                                   string_count(line, __VLOG_CASEX_REGEX__) +
+                                   string_count(line, __VLOG_CASEZ_REGEX__);
+                int nends_case = string_count(line, __VLOG_ENDCASE_REGEX__);
+                nbegins_tot += nbegins_case;
+                nends_tot += nends_case;
+                statements_open |= (nbegins_case > nends_case);
+                statements_error |= (nbegins_case < nends_case);
+
+                // Generate begins/ends
+                int nbegins_generate = string_count(line, __VLOG_GENERATE_REGEX__);
+                int nends_generate = string_count(line, __VLOG_ENDGENERATE_REGEX__);
+                nbegins_tot += nbegins_generate;
+                nends_tot += nends_generate;
+                statements_open |= (nbegins_generate > nends_generate);
+                statements_error |= (nbegins_generate < nends_generate);
+
+                // Config begins/ends
+                int nbegins_config = string_count(line, __VLOG_CONFIG_REGEX__);
+                int nends_config = string_count(line, __VLOG_ENDCONFIG_REGEX__);
+                nbegins_tot += nbegins_config;
+                nends_tot += nends_config;
+                statements_open |= (nbegins_config > nends_config);
+                statements_error |= (nbegins_config < nends_config);
+
+                // Primitive begins/ends
+                int nbegins_primitives = string_count(line, __VLOG_PRIMITIVE_REGEX__);
+                int nends_primitives = string_count(line, __VLOG_ENDPRIMITIVE_REGEX__);
+                nbegins_tot += nbegins_primitives;
+                nends_tot += nends_primitives;
+                statements_open |= (nbegins_primitives > nends_primitives);
+                statements_error |= (nbegins_primitives < nends_primitives);
+
+                // Specify begins/ends
+                int nbegins_specify = string_count(line, __VLOG_SPECIFY_REGEX__);
+                int nends_specify = string_count(line, __VLOG_ENDSPECIFY_REGEX__);
+                nbegins_tot += nbegins_specify;
+                nends_tot += nends_specify;
+                statements_open |= (nbegins_specify > nends_specify);
+                statements_error |= (nbegins_specify < nends_specify);
+
+                // Table begins/ends
+                int nbegins_table = string_count(line, __VLOG_TABLE_REGEX__);
+                int nends_table = string_count(line, __VLOG_ENDTABLE_REGEX__);
+                nbegins_tot += nbegins_table;
+                nends_tot += nends_table;
+                statements_open |= (nbegins_table > nends_table);
+                statements_error |= (nbegins_table < nends_table);
+
+                statements_open |=  (nbegins_tot == 0 && nends_tot == 0);
+
+                // Check if there's any open nested statement
+                if (statements_open) {
+                    // This means that at least one statement is still open, so let's keep appending lines
+                    prev_line = line + next_line;
+                    line = "";
+                    message = string_format(
+                            "Appending data from line %d to Statement found previously at line %d",
+                            end_line + line_offset, start_line + line_offset);
+
+                } else if (statements_error) {
+                    // Something went wrong, cause nends should NEVER be > nbegins, so let's just raise an exception here
+                    throw std::invalid_argument("Number of ENDS keywords in block surpasses the number of BEGINS "
+                                                "found, which is impossible. Raising error.");
+                } else {
+                    // Then all statements have been properly closed, so let's wrap this up
+                    prev_line = next_line;
+                    line = "";
+
+                    // Setup message
+                    message = string_format("Statement found from line %d to %d (ignored)",
+                                            start_line + line_offset, end_line + line_offset);
+                    force_print = true;
+
+                    // Setup lines
+                    start_line = end_line;
+                }
+
+                // Check if this module instance (either primitive or not, it doesn't matter)
+            } else if (std::regex_search(line, match_pattern, __VLOG_INSTANCE_PATTERN__)) {
+
+                std::string module_ref_name = match_pattern[1];
+                std::string instance_parameters = match_pattern[2];
+                std::string instance_name = match_pattern[3];
+                std::string instance_ports = match_pattern[4];
+
+                // Module name cleaning
+                // Trim the shit outta everything
                 trim(module_ref_name);
-                ltrim(line);
 
+                // Instance parameters (if any)
+                trim(instance_parameters);
                 // Now see if we have any parameters in the instantiation
                 std::vector <Parameter> inst_params;
-                std::size_t hash_pos = line.find("#");
+                std::size_t hash_pos = instance_parameters.find("#");
                 if (hash_pos != std::string::npos) {
                     // Discard "#" and look for opening parentheses
-                    line = line.substr(hash_pos + 1);
-                    ltrim(line);
+                    instance_parameters = instance_parameters.substr(hash_pos + 1);
+                    ltrim(instance_parameters);
 
-                    // Find opening parentheses
-                    std::size_t par_pos = line.find("(");
+                    // Get parameters inside parentheses
+                    std::size_t par_pos = instance_parameters.find("(");
                     if (par_pos != std::string::npos) {
                         // Discard opening parentheses
-                        line = line.substr(par_pos + 1);
-                        ltrim(line);
+                        instance_parameters = instance_parameters.substr(par_pos + 1);
+                        ltrim(instance_parameters);
 
                         // Look for closing parentheses
-                        par_pos = line.find(")");
+                        par_pos = instance_parameters.find(")");
 
                         if (par_pos != std::string::npos) {
-                            std::string inst_params_str = line.substr(0, par_pos - 1);
-                            line = line.substr(par_pos + 1);
+                            std::string inst_params_str = instance_parameters.substr(0, par_pos - 1);
+                            instance_parameters = instance_parameters.substr(par_pos + 1);
                             // Trim
-                            ltrim(line);
+                            ltrim(instance_parameters);
                             trim(inst_params_str);
 
                             // At this point we can process the parameters
@@ -1198,27 +1339,29 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                     }
                 }
 
+                // Instance name
+                trim(instance_name);
+
+                // Instance ports (if any)
+                trim(instance_ports);
+
                 // Get the ports first
-                std::size_t par_pos = line.find("(");
+                std::size_t par_pos = instance_ports.find("(");
                 std::string inst_ports = "";
                 if (par_pos != std::string::npos) {
-                    inst_ports = line.substr(par_pos+1);
-                    line = line.substr(0,par_pos);
-                    rtrim(line);
+                    inst_ports = instance_ports.substr(par_pos+1);
+                    instance_ports = instance_ports.substr(0,par_pos);
+                    rtrim(instance_ports);
                     ltrim(inst_ports);
 
-                    par_pos = line.find(")");
+                    par_pos = instance_ports.find(")");
                     if (par_pos != std::string::npos) {
-                        inst_ports = line.substr(par_pos - 1);
+                        inst_ports = instance_ports.substr(par_pos - 1);
                         rtrim(inst_ports);
                     } else {
                         inst_ports = "";
                     }
                 }
-
-                // Now we can process the name of the module
-                std::string instance_name = line;
-                trim(instance_name);
 
                 // Create instance
                 VerilogBlock instance_tmp;
@@ -1279,21 +1422,25 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                                         end_line + line_offset);
                 force_print = false;
 
+                prev_line = next_line;
+                line = "";
+
             } else {
+
+                // We don't know what this is, but it's not parseable
+                //message = string_format("Undefined content at line %d ignored\n", end_line + line_offset);
+                //prev_line = "";
+                //line = "";
+
                 // We need to keep appending lines until we find a semicolon
-                prev_line = line;
+                prev_line = line + next_line;
                 line = "";
                 message = string_format("Appending data to Instance definition found at line %d",
                                         end_line + line_offset);
             }
 
-        } else {
-
-            // We don't know what this is, but it's not parseable
-            message = string_format("Undefined content at line %d ignored\n", end_line + line_offset);
-            prev_line = "";
-            line = "";
         }
+
 
         // Update progress bar
         if (((end_line % delta == 0) || force_print) && (message != ""))
@@ -1381,7 +1528,20 @@ int Parser::__count_number_lines__(const char *FILENAME) {
 // strings in the input array is present in the input string
 bool LineChecker(std::string mainStr, std::vector<std::string> patterns, int n_patterns) {
     bool out = false;
-    for (int i =0; i < n_patterns; i++) out |= stringStartsWith(mainStr, patterns[i]);
+    int m = mainStr.length();
+    for (int i =0; i < n_patterns; i++){
+        int n = patterns[i].length();
+        bool out_tmp = stringStartsWith(mainStr, patterns[i]);
+        if (!out_tmp){
+            if (m > n){
+                out_tmp &= !(std::isalnum(mainStr[n]));
+            }
+        }
+        out |= out_tmp;
+
+        // At any time, if we found a single true case, break and return.
+        if (out) break;
+    }
     return out;
 }
 
