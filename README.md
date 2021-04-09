@@ -6,6 +6,22 @@
 ## What is this for?
 This is missing
 
+### Hierarchy inspection
+> TODO
+### Module renaming/extraction/deletion
+> TODO
+
+### Triple Module Redundancy (TMR)
+> TODO
+
+###  Generation of signals monitor testbench
+> TODO
+
+### Single-Event Effects modeling 
+> TODO
+
+
+
 ## Installation
 
 ```bash
