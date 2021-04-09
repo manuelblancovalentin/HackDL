@@ -10,6 +10,9 @@
 #include <sys/stat.h>
 #include <sstream>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+
 // Function to count occurrences of a certain pattern in string
 int string_count(std::string mainStr, std::regex pattern){
     // Initialize occurrences
@@ -90,5 +93,26 @@ std::vector<std::string> stringSplit(const std::string& s, char delimiter)
 bool file_exists (const std::string& name) {
     struct stat buffer;
     return (stat (name.c_str(), &buffer) == 0);
+}
+
+
+
+bool dir_exists (const char *dir){
+    struct stat info;
+
+    bool exists;
+    if( stat( dir, &info ) != 0 ) {
+        printf("cannot access %s\n", dir);
+        exists = false;
+    }
+    else if( info.st_mode & S_IFDIR ) {  // S_ISDIR() doesn't exist on my windows
+        printf("%s is a directory\n", dir);
+        exists = true;
+    }
+    else {
+        printf("%s is no directory\n", dir);
+        exists = false;
+    }
+    return exists;
 }
 

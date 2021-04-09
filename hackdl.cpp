@@ -1,6 +1,7 @@
 // Basic libs
 #include <iostream>
 #include <fstream>
+#include <filesystem>
 
 // Utilities
 #include "./verilog/design.h"
@@ -23,6 +24,12 @@ int process(std::string NAME,
     std::string OUTTXT = OUTPATH + PATH_SEPARATOR + NAME + "_tree.txt";
     std::string OUTMONITOR = OUTPATH + PATH_SEPARATOR + NAME + "_monitors.v";
     std::string OUTSEE = OUTPATH + PATH_SEPARATOR + NAME + "_see.v";
+
+    // Check if outpath exists, if not, create it
+    if (!dir_exists(OUTPATH.c_str())){
+        std::filesystem::create_directory(OUTPATH);
+        std::cout << "[INFO] - Output directory did not exist. Creating it at " + OUTPATH << std::endl;
+    }
 
     // Check if json file exists
     Hierarchy h;

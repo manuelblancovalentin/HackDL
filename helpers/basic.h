@@ -34,6 +34,7 @@ void trim(std::string &s);
 
 bool stringStartsWith(std::string mainStr, std::string toMatch);
 bool file_exists (const std::string& name);
+bool dir_exists (const char *dir);
 
 bool endsWith(const std::string& str, const std::string& suffix);
 
