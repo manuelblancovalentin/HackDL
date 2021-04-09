@@ -95,6 +95,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
 
 
     int delta = (int) ((double) pbar.total * 0.01);
+    if (delta < 1) delta = 1;
 
     // Init vars
     std::string line;
