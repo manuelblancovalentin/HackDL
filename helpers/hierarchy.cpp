@@ -52,7 +52,9 @@ int Hierarchy::save_json(std::string FILEPATH) {
 // Parse Json
 bool Hierarchy::serialize_hierarchy(const Json::Value& val, std::string carry){
 
-    bool is_entity = false;
+    bool is_entity = true;
+    std::vector<std::string> blacklist = {"ports","ref","arrayspan", "bitspan", "type", "value",
+                                          "parameters"};
 
     switch (val.type()) {
         case Json::objectValue: {
@@ -63,14 +65,13 @@ bool Hierarchy::serialize_hierarchy(const Json::Value& val, std::string carry){
 
                     const std::string& key = keys[i];
 
-                    for (auto& k: std::vector<std::string>{"arrayspan", "bitspan", "type", "value"}){
-                        is_entity |= (std::find(keys.begin(),keys.end(),k) != keys.end());
-                    }
+                    is_entity &= (std::find(blacklist.begin(),blacklist.end(),key) == blacklist.end());
 
                     std::string carry_tmp = (!carry.empty() ? carry + "." + key : key);
-                    if (serialize_hierarchy(val[key], carry_tmp)){
-                        __serial_instances__.push_back(carry_tmp);
-                    }
+                    if (is_entity) __serial_instances__.push_back(carry_tmp);
+
+                    // Go deeper if you can
+                    if (is_entity) serialize_hierarchy(val[key], carry_tmp);
 
                 }
             }
@@ -85,8 +86,7 @@ std::vector<std::vector<std::string>> Hierarchy::subset(std::vector<std::string>
     // Init output
     std::map<std::string, std::vector<std::string>> out_subset;
 
-    std::cout << "[INFO] - Looking for patterns to create subset" << std::endl;
-
+    if (!patterns.empty()) std::cout << "[INFO] - Looking for patterns to create subset" << std::endl;
 
     // Loop thru patterns
     for (auto& pat: patterns){

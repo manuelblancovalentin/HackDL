@@ -30,7 +30,7 @@ set(CMAKE_CXX_STANDARD 20)
 add_executable(HackDL hackdl.cpp verilog/Parser.cpp verilog/Parser.h helpers/gui.cpp helpers/gui.h helpers/basic.cpp
         helpers/basic.h verilog/definitions.h verilog/blocks.h verilog/design.cpp verilog/design.h
         jsoncpp/jsoncpp.cpp jsoncpp/json/json.h jsoncpp/json/json-forwards.h helpers/hierarchy.cpp helpers/hierarchy.h
-        helpers/flags.h verilog/blocks.cpp verilog/taskers.cpp verilog/taskers.h)
+        helpers/flags.h verilog/blocks.cpp verilog/taskers.cpp verilog/taskers.h verilog/TMR.cpp verilog/TMR.h)
 #target_link_libraries(${PROJECT_NAME}
 #        ${Boost_LIBRARIES}
 #        ${Boost_FILESYSTEM_LIBRARY}

@@ -30,7 +30,8 @@ typedef enum _FLAGS__ {
     AUTO_INCLUDE  = 1,    // 000001
     RELOAD = 2,           // 000010
     MONITOR = 4,          // 000100
-    SEE = 8
+    SEE = 8,              // 001000
+    TMR = 16              // 010000
 } FLAGS;
 
 DEFINE_ENUM_FLAG_OPERATORS(FLAGS);

@@ -7,3 +7,8 @@ cd ../../
               -p  "\bDF\d+.(Q|D)\b" \
               --monitor \
               --SEE --sim-pulses 2 --max-upset-time 10 --min-upset-time 1
+
+# FF TMR
+./HackDL -n triplicated_module -s /home/mbv6231/CLionProjects/HackDL/examples/counter/tb.v \
+  -l /home/mbv6231/CLionProjects/HackDL/examples/counter/ -o /home/mbv6231/CLionProjects/HackDL/examples/counter/tmr \
+  --TMR 3 -p  "\bDF\d+.(Q|D)\b"

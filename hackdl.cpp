@@ -9,6 +9,7 @@
 #include "./verilog/taskers.h"
 #include "helpers/basic.h"
 #include "./args/args.hxx"
+#include "./verilog/TMR.h"
 
 /* Here we only approximate the echo functionality */
 int process(std::string NAME,
@@ -16,7 +17,8 @@ int process(std::string NAME,
             std::vector <std::string> SOURCES, std::vector <std::string> LIB,
             std::string OUTPATH,
             std::vector<std::string> PATTERNS,
-            int SIM_PULSES = 1, int MAX_UPSET_TIME = 10, int MIN_UPSET_TIME = 1){
+            int SIM_PULSES = 1, int MAX_UPSET_TIME = 10, int MIN_UPSET_TIME = 1,
+            int TMR = 0, std::string TMR_SUFFIX = "TMR"){
 
     // Build outfile
     if (endsWith(OUTPATH,PATH_SEPARATOR)) {OUTPATH = OUTPATH.substr(0,OUTPATH.size()-1);}
@@ -54,6 +56,9 @@ int process(std::string NAME,
     // Find patterns
     std::vector<std::vector<std::string>> subsets = h.subset(PATTERNS);
 
+    // Triplication of modules
+    if (flags & FLAGS::TMR) triplicate_modules(TMR, TMR_SUFFIX, subsets);
+
     // Monitor tasks
     if (flags & FLAGS::MONITOR) generate_monitor_tasks(OUTMONITOR,subsets);
 
@@ -76,11 +81,13 @@ int main(int argc, char* argv[])
     int SIM_PULSES = 2;
     int MAX_UPSET_TIME = 10;
     int MIN_UPSET_TIME = 1;
+    std::string TMR_SUFFIX = "TMR";
+    int TMR = 0;
 
     // Setup flags
     FLAGS flags(FLAGS::NONE);
 
-    args::ArgumentParser parser("HackDL program.", "Sample text.");
+    args::ArgumentParser parser("HackDL program.", "For extra info visit: github.com/manuelblancovalentin/HackDL");
     args::HelpFlag help(parser, "help", "Display this help menu", {'h', "help"});
 
     // Flags
@@ -88,6 +95,12 @@ int main(int argc, char* argv[])
     args::Flag auto_include(parser, "auto-include", "Automatically include and parse files when an `include directive is found", {"auto-include"});
     args::Flag monitor(parser, "monitor", "Generate monitor v files on subset defined by reg ex patterns", {"monitor"});
     args::Flag see(parser, "see", "Generate see tasks v files on subset defined by reg ex patterns", {"SEE"});
+
+    // TMR
+    args::ValueFlag<int> tmr(parser, "tmr", "Triplicate modules defined as subset by reg ex patterns\n\t0 -> No "
+                                       "triplication "
+                                  "(Default mode)\n\t1 -> Only Registers\n\t2 -> Registers and clock\n\t3 -> Full "
+                                  "TMR\n\t4 -> Clock skewing TMR (beta)", {"TMR"});
 
     // Sources
     args::ValueFlagList<std::string> sources(parser, "source", "List of sources", {'s',"source"});
@@ -99,11 +112,17 @@ int main(int argc, char* argv[])
     // Regex patterns
     args::ValueFlagList<std::string> patterns(parser, "pattern", "Regular expressions to be matched", {'p',"pattern"});
 
-    // See params
+    // SEE params
     args::Group seecommands(parser, "SEE parameters");
     args::ValueFlag<int> simultaneous_pulses(seecommands, "simultaneous-pulses", "Number of simultaneous pulses for SEE", {"sim-pulses"});
     args::ValueFlag<int> max_upset_time(seecommands, "max-upset-time", "Max upset time for upset pulses for SEE", {"max-upset-time"});
     args::ValueFlag<int> min_upset_time(seecommands, "min-upset-time", "Min upset time for upset pulses for SEE", {"min-upset-time"});
+
+    // TMR params
+    args::Group tmrcommands(parser, "TMR parameters");
+    args::ValueFlag<std::string> tmr_suffix(tmrcommands, "tmr-suffix","Suffix to be added to the triplicated module "
+                                                                      "definition",{"tmr-suffix"});
+
 
     //args::ValueFlag<int> integer(parser, "integer", "The integer flag", {'i'});
     //args::ValueFlagList<char> characters(parser, "characters", "The character flag", {'c'});
@@ -142,6 +161,13 @@ int main(int argc, char* argv[])
     if (libs) { for (const auto l: args::get(libs)) {LIB.push_back(l);}; }
     if (patterns) { for (const auto p: args::get(patterns)) {PATTERNS.push_back(p);}; }
 
+    // TMR params
+    if (tmr) {
+        flags |= FLAGS::TMR;
+        TMR = args::get(tmr);
+    }
+    if (tmr_suffix) {TMR_SUFFIX = args::get(tmr_suffix);}
+
     // SEE params
     if (simultaneous_pulses) {SIM_PULSES = args::get(simultaneous_pulses);}
     if (max_upset_time) {MAX_UPSET_TIME = args::get(max_upset_time);}
@@ -152,7 +178,9 @@ int main(int argc, char* argv[])
     //if (numbers) { for (const auto nm: args::get(numbers)) { std::cout << "n: " << nm << std::endl; } }
 
     // Now pass to process
-    return process(NAME, flags, SOURCES, LIB, OUTPATH, PATTERNS, SIM_PULSES, MAX_UPSET_TIME, MIN_UPSET_TIME);
+    return process(NAME, flags, SOURCES, LIB, OUTPATH, PATTERNS,
+                   SIM_PULSES, MAX_UPSET_TIME, MIN_UPSET_TIME,
+                   TMR, TMR_SUFFIX);
 
 }
 
