@@ -30,6 +30,13 @@ void VerilogBlock::__build_subhierarchy__(std::string TAB = ""){
         subhierarchy = string_format("%s\"ref\" : \"%s\"", TAB.c_str(), ref.c_str());
     }
 
+    // Sourcefile
+    if (!sourcefile_.empty()){
+        subhierarchy += string_format(",\n%s\"sourcefile_\" : \"%s\"", TAB.c_str(), sourcefile_.c_str());
+    } else {
+        subhierarchy += "\n";
+    }
+
     if (print_params|print_ports|print_netwires|print_instances){
         subhierarchy += ",";
     }
@@ -125,6 +132,10 @@ void VerilogBlock::__build_subhierarchy__(std::string TAB = ""){
                                        TAB.c_str());
 
             // Construct values
+            // Sourcefile
+            subhierarchy += string_format("%s\"sourcefile_\" : \"%s\",\n", (TAB + "\t").c_str(),
+                                          netwires[nw].sourcefile_.c_str());
+
             //tmp[nw.name]["type"] = nw.type;
             subhierarchy += string_format("%s\"type\" : \"%s\",\n", (TAB + "\t").c_str(),
                                        netwires[nw].type.c_str());

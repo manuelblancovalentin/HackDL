@@ -69,7 +69,8 @@ VerilogBlock Parser::__parse_file__(std::vector <VerilogBlock>& module_definitio
                                              stream, pbar,
                                              start_line, ancestors, children,
                                              "",
-                                             TAB, NAME, "");
+                                             TAB, NAME, "",
+                                             FILENAME);
 
     // Close stream
     stream.close();
@@ -91,7 +92,8 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                                std::string prev_line,
                                std::string TAB,
                                std::string NAME,
-                               std::string REF) {
+                               std::string REF,
+                               std::string SRC) {
 
 
     int delta = (int) ((double) pbar.total * 0.01);
@@ -459,7 +461,8 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                                                              post_semicolon,
                                                              TAB_tmp,
                                                              module_name,
-                                                             "module");
+                                                             "module",
+                                                             SRC);
 
                     // build subhierarchy before returning block
                     vlogtmp.__build_subhierarchy__(TAB_tmp);
@@ -849,7 +852,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                         first_time = false;
 
                         // Now Init Netwire object
-                        NetWire nw = {name, type, bitspan, arrayspan, value};
+                        NetWire nw(name, type, bitspan, arrayspan, value,SRC);
                         netwires.push_back(nw);
 
                         // Check if we have to append this to ports
@@ -886,7 +889,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                         names_msg += ", " + name;
 
                     // Now Init Netwire object
-                    NetWire nw = {name, type, bitspan, arrayspan, value};
+                    NetWire nw(name, type, bitspan, arrayspan, value,SRC);
                     netwires.push_back(nw);
 
                     // Check if we have to append this to ports
@@ -1374,6 +1377,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                     instance_tmp.ancestors = ancestors_tmp;
                     instance_tmp.ref = module_ref_name;
                     instance_tmp.name = instance_name;
+                    instance_tmp.sourcefile_ = SRC;
                     // Push into vector
                     vblock.push(module_ref_name, instance_tmp);
 
@@ -1387,6 +1391,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                     instance_tmp.parameters = inst_params;
                     instance_tmp.ancestors = ancestors_tmp;
                     instance_tmp.subhierarchy = subhierarchy_tmp;
+                    instance_tmp.sourcefile_ = SRC;
 
                     // Push into vector
                     vblock.push(module_ref_name, instance_tmp);
@@ -1468,10 +1473,9 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
     vblock.inner_modules = mod_defs_tmp;
     vblock.inner_moddefs = mod_defs_tmp_str;
     vblock.orphans = orphans_tmp;
+    vblock.sourcefile_ = SRC;
     // build subhierarchy before returning block
     vblock.__build_subhierarchy__(TAB);
-
-    // Push orphans?
 
 
     // Add module_definitions

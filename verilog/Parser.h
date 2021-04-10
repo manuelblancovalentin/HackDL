@@ -29,7 +29,8 @@ private:
                            std::string previous_line = "",
                            std::string TAB = "",
                            std::string NAME = "block",
-                           std::string REF = "");
+                           std::string REF = "",
+                           std::string SRC = "");
 
     VerilogBlock __parse_file__(std::vector <VerilogBlock>& module_definitions,
                                 std::map<std::string,VerilogBlock>& module_references,

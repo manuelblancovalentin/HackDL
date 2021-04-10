@@ -13,7 +13,9 @@ class Hierarchy: public Json::Value {
 private:
     //Json::Value __hierarchy__;
     Json::Value __hierarchy__;
+    Json::Value __sources__;
     std::vector<std::string> __serial_instances__;
+    std::map<std::string, std::string> __serial_sources__;
 
     // Tree
     std::string __tree__;
@@ -31,11 +33,11 @@ public:
     int print_txt(std::string FILEPATH) {return __print__(__hierarchy__,FILEPATH);}
 
     // Constructor
-    Hierarchy(Json::Value h = new Json::Value()): __hierarchy__(h) {};
+    Hierarchy(Json::Value h = new Json::Value()): __hierarchy__(h){};
 
     // Method to find subset according to pattern
     std::vector<std::vector<std::string>> subset(std::vector<std::string> patterns);
-    bool serialize_hierarchy(const Json::Value& val, std::string carry = "");
+    bool serialize_hierarchy(const Json::Value& val, std::string carry = "", std::string src = "");
 };
 
 

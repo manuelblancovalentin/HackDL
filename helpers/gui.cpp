@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <iostream>
 #include "basic.h"
+#include <numeric>
 
 // Definitions
 std::string PBARFILLCHAR = "█";
@@ -78,10 +79,22 @@ void tree(std::string& str, const Json::Value& val, std::string TAB, bool first,
             else {
                 str += " : [";
                 std::string newIndent = TAB + "\t";
+                std::vector<size_t> sizes;
+                std::vector<Json::ArrayIndex> indexes;
+                for (Json::ArrayIndex i=0; i<size; i++){
+                    sizes.push_back(val[i].size());
+                    indexes.push_back(i);
+                }
+
+                //Assume A is a given vector with N elements
+                std::iota(indexes.begin(),indexes.end(),0); //Initializing
+                sort( indexes.begin(),indexes.end(), [&](int i,int j){return sizes[i]<sizes[j];} );
+
+
                 for (Json::ArrayIndex i=0; i<size; i++) {
                     //Indent(ofs, newIndent);
                     //str += TAB;
-                    tree(str, val[i], newIndent, first, sep = " ");
+                    tree(str, val[indexes[i]], newIndent, first, sep = " ");
                     str += (i + 1 == size ? "" : ",");
                 }
                 //str += TAB;
@@ -96,6 +109,19 @@ void tree(std::string& str, const Json::Value& val, std::string TAB, bool first,
 
                 //str += !first ?  "├" : " "; //"{\n"
                 std::vector<std::string> keys = val.getMemberNames();
+
+                std::vector<size_t> sizes;
+                std::vector<Json::ArrayIndex> indexes;
+                for (Json::ArrayIndex i=0; i<keys.size(); i++){
+                    const std::string& key = keys[i];
+                    sizes.push_back(val[key].size());
+                    indexes.push_back(i);
+                }
+
+                //Assume A is a given vector with N elements
+                std::iota(indexes.begin(),indexes.end(),0); //Initializing
+                sort( indexes.begin(),indexes.end(), [&](int i,int j){return sizes[i]<sizes[j];} );
+
                 for (size_t i=0; i<keys.size(); i++) {
 
                     // Print depth.
@@ -107,7 +133,7 @@ void tree(std::string& str, const Json::Value& val, std::string TAB, bool first,
                     for (int nk = 0; nk < n; nk++) hf += "-";
                     for (int nk = 0; nk < n; nk++) s += " ";
 
-                    const std::string& key = keys[i];
+                    const std::string& key = keys[indexes[i]];
                     str += (!first ? "\n" + TAB + c + hf : "");
                     str += key;
 
@@ -131,73 +157,3 @@ void tree(std::string& str, const Json::Value& val, std::string TAB, bool first,
 
 
 
-
-// Print tree
-
-/*
-std::string tree(const Json::Value &val, std::string TAB, bool last, bool first){
-
-    // Init string
-    std::string str = "";
-    // Set some params
-    int n = 3;
-    int nn = 0;
-
-    // Loop thru elements
-    for (Json::Value::const_iterator itr = val.begin(); itr != val.end(); itr++) {
-
-        // Print depth.
-        std::string c;
-        if (nn != (val.size() - 1)) {
-            c = "├";
-        } else {
-            c = "└";
-        }
-
-        // This is not efficient at all, we could use string formatting expliciting
-        // the num of times we want to repeat a character, but I'm tired.
-        std::string hf, s;
-        for (int nk = 0; nk < n; nk++) hf += "-";
-        for (int nk = 0; nk < n; nk++) s += " ";
-
-        std::string val_key = getJsonValue(itr.key());
-
-
-        if (!first) {
-            // Append to str
-            str += "\n" + TAB + c + hf + val_key;
-        } else {
-            str += val_key;
-        }
-
-        std::string c2;
-        if (nn == (val.size() - 1)) {
-            c2 = " ";
-        } else {
-            c2 = "│";
-        }
-
-        std::string tab_u;
-
-        if (!first) {
-            tab_u = TAB + c2 + s;
-        } else {
-            tab_u += ' ';
-        }
-
-        // Recursivity
-        std::size_t lopn = (*itr).size();
-        if (lopn > 0) {
-            str += tree(*itr, tab_u, last & (nn == (val.size() - 1)), false);
-        } else {
-            str += " : " + getJsonValue(*itr);
-        }
-
-        // Increase nn
-        nn++;
-    }
-
-
-    return str;
-}
-*/

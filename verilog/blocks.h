@@ -9,37 +9,43 @@
 #include <vector>
 #include <map>
 
+
 // Ports structure
 struct Ports
 {
     std::vector<std::string> input;
     std::vector<std::string> output;
     std::vector<std::string> inout;
+
 };
 
 // Netwire structure (holds regs, wires, ints, etc.)
-struct NetWire
+class NetWire
 {
+public:
     std::string name;
     std::string type;
     std::string bitspan;
     std::string arrayspan;
     std::string value;
+    std::string sourcefile_;
 
     // Constructor
     NetWire(std::string Name, std::string Type, std::string BitSpan,
-            std::string ArraySpan, std::string Value){
+            std::string ArraySpan, std::string Value, std::string Sourcefile_){
         name = Name;
         type = Type;
         bitspan = BitSpan;
         arrayspan = ArraySpan;
         value = Value;
+        sourcefile_ = Sourcefile_;
     }
 };
 
 // Parameter structure
-struct Parameter
+class Parameter
 {
+public:
     std::string name;
     std::string value;
 
@@ -53,8 +59,9 @@ struct Parameter
 
 
 // VerilogBlock (module, file, whatever)
-struct VerilogBlock
+class VerilogBlock
 {
+public:
     std::string ref;
     std::string name;
     std::map<std::string, std::vector<VerilogBlock>> instances;
@@ -67,6 +74,7 @@ struct VerilogBlock
     std::vector <std::string> inner_moddefs;
     std::string subhierarchy;
     std::map<std::string, std::vector<std::string>> orphans;
+    std::string sourcefile_;
 
     bool push(std::string, VerilogBlock);
 
@@ -88,7 +96,8 @@ struct VerilogBlock
                  std::vector <VerilogBlock> *Inner_Modules = new std::vector<VerilogBlock>(),
                  std::vector <std::string> Inner_ModDefs = {},
                  std::string subhierarchy = "",
-                 std::map<std::string, std::vector<std::string>> *Orphans = new std::map<std::string, std::vector<std::string>>()){
+                 std::map<std::string, std::vector<std::string>> *Orphans = new std::map<std::string, std::vector<std::string>>(),
+                 std::string Source = ""){
         ref = Ref;
         name = Name;
         instances = *Instances;
@@ -101,13 +110,16 @@ struct VerilogBlock
         inner_moddefs = Inner_ModDefs;
         subhierarchy = subhierarchy;
         orphans = *Orphans;
+        sourcefile_ = Source;
     }
 
 };
 
 
 // Top Module
-struct TopModule {
+class TopModule
+{
+public:
     std::string name;
     VerilogBlock* REF;
 

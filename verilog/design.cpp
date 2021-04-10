@@ -157,22 +157,24 @@ Hierarchy Design::get_hierarchy() {
     int TAB = 2;
     const char *tab_str = "\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t";
 
+    std::string hSources = "{\n";
+
     int tpmmax = top_modules.size();
     for (int tpm = 0; tpm < tpmmax; tpm++){
-        // Get name
+        // Get vars
         std::string h_name = top_modules[tpm].name;
+        VerilogBlock* REF (top_modules[tpm].REF);
 
-        // Create entry for this top_module
+        /*
+         * Create hierarchy entry for this module
+         */
         hierarchy += string_format("%.*s\"%s\" : \n%.*s{\n", TAB, tab_str, h_name.c_str(), TAB, tab_str);
-        //hierarchy += Design::__recursive_seeker__(*(top_modules[tpm].REF), module_references, TAB + 1, tab_str,
-        //                                          &pbar,
-        //                                          &counter);
-        //Json::Value tmp = Design::__recursive_seeker__(*(tpm.REF), module_definitions);
-        hierarchy += (top_modules[tpm].REF)->subhierarchy;
-
+        /*
+         * Create source/definition entry for this module
+         */
+        hierarchy += REF->subhierarchy;
         // Append to hierarchy
         hierarchy += string_format("%.*s}", TAB, tab_str);
-        //hierarchy["top_modules"][h_name] = tmp;
         if (tpm != (tpmmax - 1)){
             hierarchy += ",";
         }
@@ -184,7 +186,8 @@ Hierarchy Design::get_hierarchy() {
     hierarchy += "\t}\n";
     hierarchy += "}";
 
-    std::cout << hierarchy << std::endl;
+
+    //std::cout << hierarchy << std::endl;
 
     // Transform this to Json::Value
     Json::Value root;
@@ -200,9 +203,6 @@ Hierarchy Design::get_hierarchy() {
 
     // Set hierarchy in Design (private)
     Design::__hierarchy__ = h;
-
-    // Remember to serialize
-    h.serialize_hierarchy(root);
 
     // Return and exit
     return h;
@@ -314,275 +314,3 @@ std::string Design::__recursive_seeker__(VerilogBlock& vblock,
 
     return hierarchy_tmp;
 }
-
-
-        /*
-        if (std::strcmp(ref.c_str(), "module") != 0){
-
-            if (!module_references.contains(ref)) {
-                // not found
-                hierarchy += string_format("%.*s\"ref\": \"%s\"\n",
-                                           TAB, tab_str,
-                                           ref.c_str());
-
-            } else {
-                // found
-                VerilogBlock md = module_references.at(ref);
-
-                // Place subhierarchy of module
-                hierarchy += md.subhierarchy;
-
-                // Reassign instances
-                //tmp_instances = md.instances;
-            }
-
-*/
-            // Try to find ref in module_definitions
-            /*
-            for (auto& md: module_definitions){
-                if (strcmp(md.name.c_str(), ref.c_str()) == 0){
-                    // Reassign params
-                    //tmp_params = &md.parameters;
-                    // Reassign ports
-                    //tmp_ports = &md.ports;
-                    // Reassign netwires
-                    //tmp_netwires = &md.netwires;
-                    // Reassign instances
-                    tmp_instances = &md.instances;
-
-                    // Place subhierarchy of module
-                    hierarchy += (&md)->subhierarchy;
-                }
-            }
-            */
-/*
-        } else {
-            VerilogBlock md = module_references.at(name);
-
-            // Place subhierarchy of module
-            hierarchy += md.subhierarchy;
-
-            // Reassign instances
-            tmp_instances = md.instances;
-
-        }
-
-        bool print_instances = !tmp_instances.empty();
-
-
-        // Now the instances
-        if (print_instances) {
-            int TAB_tmp = TAB;
-            int itmax = tmp_instances.size();
-            int itt = 0;
-            // Loop thru instances
-            for (std::map<std::string, std::vector<VerilogBlock>>::iterator it = tmp_instances.begin();
-                 it != tmp_instances.end(); it++) {
-                int ittt = 0;
-                int itttmax = it->second.size();
-                for (auto &itmp: it->second) {
-                    hierarchy += string_format("%.*s\"%s\" : \n%.*s{\n", TAB, tab_str, itmp.name.c_str(),
-                                               TAB, tab_str);
-                    __recursive_seeker__(itmp, hierarchy, module_references, TAB_tmp + 1, tab_str);
-
-                    // Append to hierarchy
-                    hierarchy += string_format("%.*s}", TAB, tab_str);
-
-                    if ((itt != (itmax - 1)) && (ittt != (itttmax - 1))) {
-                        hierarchy += ",";
-                    }
-                    hierarchy += "\n";
-                    ittt++;
-                }
-                itt++;
-            }
-        }
-
-
-    } else {
-        std::cout << "What kind of pokémon is this?" << std::endl;
-    }
-
-*/
-        /*
-        bool print_params = !(*tmp_params).empty();
-        bool print_ports = !(*tmp_ports).input.empty() || !(*tmp_ports).output.empty() || !(*tmp_ports).inout.empty();
-        bool print_netwires = !(*tmp_netwires).empty();
-
-
-        // Place reference
-        hierarchy += string_format("%.*s\"ref\" : \"%s\",\n", TAB, tab_str, ref.c_str());
-
-        //tmp["ref"] = ref;
-
-        // Parse parameters
-        if (print_params){
-            // Open parameters field
-            hierarchy += string_format("%.*s\"parameters\" : \n%.*s{\n", TAB, tab_str, TAB, tab_str);
-            int pmax = (*tmp_params).size();
-            for (int p = 0; p < pmax; p++){
-                hierarchy += string_format("%.*s\"%s\" : \"%s\"", TAB + 1, tab_str,
-                                           (*tmp_params)[p].name.c_str(),
-                                           (*tmp_params)[p].value.c_str());
-                if (p != (pmax-1)){
-                    hierarchy += ",";
-                }
-                hierarchy += "\n";
-            }
-
-            //for (auto& p: tmp_params){
-           //     //tmp["parameters"][p.name] = p.value;
-           //     hierarchy += string_format("%.*s\"%s\" : \"%s\",\n", TAB + 1, tab_str, p.name.c_str(),p.value.c_str());
-            //}
-            // Close parameters field
-            hierarchy += string_format("%.*s}", TAB, tab_str);
-
-            if (print_ports|print_netwires|print_instances){
-                hierarchy += ",";
-            }
-            hierarchy += "\n";
-        }
-
-        // Ports
-        // Open field
-        if (print_ports){
-            hierarchy += string_format("%.*s\"ports\" : \n%.*s{\n", TAB, tab_str, TAB, tab_str);
-            // Inputs
-            //Json::Value tmp_iports(Json::arrayValue);
-            // Open inputs
-            hierarchy += string_format("%.*s\"input\" : \n%.*s[\n", TAB + 1, tab_str, TAB + 1, tab_str);
-            int pmax = (*tmp_ports).input.size();
-            for (int p = 0; p < pmax; p++){
-                hierarchy += string_format("%.*s\"%s\"", TAB + 2, tab_str, (*tmp_ports).input[p].c_str());
-                if (p != (pmax-1)){
-                    hierarchy += ",";
-                }
-                hierarchy += "\n";
-            }
-
-            //for (auto& p: tmp_ports.input){
-            //    //tmp_iports.append(p);
-            //    hierarchy += string_format("%.*s\"%s\",\n", TAB + 2, tab_str, p.c_str());
-            //}
-
-            //tmp["ports"]["input"] = tmp_iports;
-            // Close input field
-            hierarchy += string_format("%.*s],\n", TAB + 1, tab_str);
-
-            // Open outputs
-            hierarchy += string_format("%.*s\"output\" : \n%.*s[\n", TAB + 1, tab_str, TAB + 1, tab_str);
-            pmax = (*tmp_ports).output.size();
-            for (int p = 0; p < pmax; p++){
-                hierarchy += string_format("%.*s\"%s\"", TAB + 2, tab_str, (*tmp_ports).output[p].c_str());
-                if (p != (pmax-1)){
-                    hierarchy += ",";
-                }
-                hierarchy += "\n";
-            }
-            // Close output field
-            hierarchy += string_format("%.*s],\n", TAB + 1, tab_str);
-
-            // Open inout
-            hierarchy += string_format("%.*s\"inout\" : \n%.*s[\n", TAB + 1, tab_str, TAB + 1, tab_str);
-            pmax = (*tmp_ports).inout.size();
-            for (int p = 0; p < pmax; p++){
-                hierarchy += string_format("%.*s\"%s\"", TAB + 2, tab_str, (*tmp_ports).inout[p].c_str());
-                if (p != (pmax-1)){
-                    hierarchy += ",";
-                }
-                hierarchy += "\n";
-            }
-            // Close inout field
-            hierarchy += string_format("%.*s]\n", TAB + 1, tab_str);
-
-            // // Outputs
-            //Json::Value tmp_oports(Json::arrayValue);
-            //for (auto& p: tmp_ports.output){
-            //    tmp_oports.append(p);
-            //}
-            //tmp["ports"]["output"] = tmp_oports;
-
-
-            // // Inouts
-            //Json::Value tmp_ioports(Json::arrayValue);
-            //for (auto& p: tmp_ports.inout){
-            //    tmp_ioports.append(p);
-            //}
-            //tmp["ports"]["inout"] = tmp_ioports;
-
-            hierarchy += string_format("%.*s}", TAB, tab_str);
-
-            if (print_netwires|print_instances){
-                hierarchy += ",";
-            }
-            hierarchy += "\n";
-        }
-        // Close ports field
-
-
-        // Netwires
-        if (print_netwires) {
-            int nwmax = (*tmp_netwires).size();
-            for (int nw = 0; nw < nwmax; nw++) {
-                // Open netwire field
-                hierarchy += string_format("%.*s\"%s\" : \n%.*s{\n", TAB, tab_str, (*tmp_netwires)[nw].name.c_str(),
-                                           TAB, tab_str);
-
-                // Construct values
-                //tmp[nw.name]["type"] = nw.type;
-                hierarchy += string_format("%.*s\"type\" : \"%s\",\n", TAB + 1, tab_str,
-                                           (*tmp_netwires)[nw].type.c_str());
-
-                //tmp[nw.name]["bitspan"] = nw.bitspan;
-                hierarchy += string_format("%.*s\"bitspan\" : \"%s\",\n", TAB + 1, tab_str,
-                                           (*tmp_netwires)[nw].bitspan.c_str());
-
-                //tmp[nw.name]["arrayspan"] = nw.arrayspan;
-                hierarchy += string_format("%.*s\"arrayspan\" : \"%s\",\n", TAB + 1, tab_str,
-                                           (*tmp_netwires)[nw].arrayspan.c_str());
-
-                //tmp[nw.name]["value"] = nw.value;
-                hierarchy += string_format("%.*s\"value\" : \"%s\"\n", TAB + 1, tab_str,
-                                           (*tmp_netwires)[nw].value.c_str());
-
-                // Close netwire field
-                hierarchy += string_format("%.*s}", TAB, tab_str);
-
-                if ((nw != (nwmax - 1)) | print_instances) {
-                    hierarchy += ",";
-                }
-                hierarchy += "\n";
-            }
-        }
-        */
-
-
-    //return tmp;
-
-
-
-    /*
-    for (int it = 0; it < itmax; it++) {
-
-        // Create entry for this top_module
-
-        hierarchy += string_format("%.*s\"%s\" : \n%.*s{\n", TAB, tab_str, tmp_instances[it].name.c_str(),
-                                   TAB, tab_str);
-
-        // Call recursive seeker on instance
-        __recursive_seeker__(tmp_instances[it], hierarchy, module_references, TAB_tmp + 1, tab_str);
-        //tmp[it.name] = __recursive_seeker__(it, hierarchy, module_definitions, TAB_tmp + 1);
-
-        // Append to hierarchy
-        hierarchy += string_format("%.*s}", TAB, tab_str);
-
-        if (it != (itmax - 1)) {
-            hierarchy += ",";
-        }
-        hierarchy += "\n";
-
-    }
-}
-     */
-
-//}

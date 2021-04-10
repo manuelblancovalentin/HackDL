@@ -50,11 +50,11 @@ int Hierarchy::save_json(std::string FILEPATH) {
 }
 
 // Parse Json
-bool Hierarchy::serialize_hierarchy(const Json::Value& val, std::string carry){
+bool Hierarchy::serialize_hierarchy(const Json::Value& val,  std::string carry, std::string parent_src){
 
     bool is_entity = true;
-    std::vector<std::string> blacklist = {"ports","ref","arrayspan", "bitspan", "type", "value",
-                                          "parameters"};
+    std::vector<std::string> blacklist = {"ref","arrayspan", "bitspan", "type", "value",
+                                          "parameters", "sourcefile_"};
 
     switch (val.type()) {
         case Json::objectValue: {
@@ -68,10 +68,24 @@ bool Hierarchy::serialize_hierarchy(const Json::Value& val, std::string carry){
                     is_entity &= (std::find(blacklist.begin(),blacklist.end(),key) == blacklist.end());
 
                     std::string carry_tmp = (!carry.empty() ? carry + "." + key : key);
-                    if (is_entity) __serial_instances__.push_back(carry_tmp);
 
                     // Go deeper if you can
-                    if (is_entity) serialize_hierarchy(val[key], carry_tmp);
+                    if (is_entity){
+
+                        __serial_instances__.push_back(carry_tmp);
+
+                        std::vector<std::string> nkeys = val[key].getMemberNames();
+                        std::string next_src = parent_src;
+                        if (std::find(keys.begin(),nkeys.end(),"sourcefile_") != nkeys.end()){
+                            next_src = val[key]["sourcefile_"].asString();
+                            __serial_sources__.insert(std::pair<std::string,std::string>(carry, next_src));
+                        } else if (!parent_src.empty()) {
+                            __serial_sources__.insert(std::pair<std::string,std::string>(carry, parent_src));
+                        }
+
+                        serialize_hierarchy(val[key], carry_tmp, next_src);
+
+                    }
 
                 }
             }
@@ -91,7 +105,6 @@ std::vector<std::vector<std::string>> Hierarchy::subset(std::vector<std::string>
     // Loop thru patterns
     for (auto& pat: patterns){
         // Check if exists
-        //std::regex rgx(pat);
         const std::regex r(pat);
 
         // Loop thru __serialized instances__
@@ -103,8 +116,6 @@ std::vector<std::vector<std::string>> Hierarchy::subset(std::vector<std::string>
 
                 std::string ent_tmp = ent;
                 for (int i=1; i< sm.size(); i++) {
-                    //std::string ent_tmp = std::regex_replace (ent, sm[i].str(),"$");
-                    //std::cout << sm[i] << " at " << sm.position(i) << std::endl;
                     ent_tmp.replace(sm.position(i),sm.position(i)+sm[i].str().size(),"$");
                 }
 
