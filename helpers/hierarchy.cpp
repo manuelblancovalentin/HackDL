@@ -13,6 +13,9 @@ std::map<std::string, std::string> Hierarchy::get_sources(){
     return __serial_sources__;
 };
 
+std::map<std::string, std::string> Hierarchy::get_instances(){
+    return __serial_instances__;
+};
 
 // Load from json
 int Hierarchy::load_json(std::string FILEPATH){
@@ -76,8 +79,15 @@ bool Hierarchy::serialize_hierarchy(const Json::Value& val,  std::string carry, 
 
                     // Go deeper if you can
                     if (is_entity){
+                        std::string ref = "";
+                        if (val[key].type() == Json::objectValue) {
+                            std::vector<std::string> nkeys = val[key].getMemberNames();
 
-                        __serial_instances__.push_back(carry_tmp);
+                            if (std::find(nkeys.begin(), nkeys.end(), "ref") != nkeys.end()) {
+                                ref = val[key]["ref"].asString();
+                            }
+                        }
+                        __serial_instances__.insert(std::pair<std::string, std::string>(carry_tmp,ref));
 
                         std::string next_src = parent_src;
                         if (std::find(keys.begin(),keys.end(),"sourcefile_") != keys.end()){
@@ -113,11 +123,12 @@ std::vector<std::vector<std::string>> Hierarchy::subset(std::vector<std::string>
         const std::regex r(pat);
 
         // Loop thru __serialized instances__
-        for (auto const& ent: __serial_instances__){
+        for (const auto& pair: __serial_instances__){
             std::smatch sm;
-
+            std::string ent = pair.first;
+            std::string ref = pair.second;
             if (regex_search(ent, sm, r)) {
-                std::cout << string_format("\tPattern %s found in hierarchy in instance %s",pat.c_str(),ent.c_str()) << std::endl;
+                std::cout << string_format("\tPattern %s found in hierarchy in instance %s of type %s",pat.c_str(),ent.c_str(),ref.c_str()) << std::endl;
 
                 std::string ent_tmp = ent;
                 for (int i=1; i< sm.size(); i++) {

@@ -14,7 +14,7 @@ private:
     //Json::Value __hierarchy__;
     Json::Value __hierarchy__;
     Json::Value __sources__;
-    std::vector<std::string> __serial_instances__;
+    std::map<std::string, std::string> __serial_instances__;
     std::map<std::string, std::string> __serial_sources__;
 
     // Tree
@@ -29,6 +29,7 @@ public:
     int load_json(std::string FILEPATH);
 
     std::map<std::string, std::string> get_sources();
+    std::map<std::string, std::string> get_instances();
 
     // Method to print tree
     void print(void) {std::cout << __hierarchy__; std::cout << std::endl; }

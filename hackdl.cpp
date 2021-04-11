@@ -57,7 +57,9 @@ int process(std::string NAME,
     std::vector<std::vector<std::string>> subsets = h.subset(PATTERNS);
 
     // Triplication of modules
-    if (flags & FLAGS::TMR) triplicate_modules(TMR, subsets, h.get_sources(), TMR_SUFFIX);
+    if (flags & FLAGS::TMR) triplicate_modules(TMR, subsets, h.get_instances(),
+                                               h.get_sources(), TMR_SUFFIX,
+                                               OUTPATH);
 
     // Monitor tasks
     if (flags & FLAGS::MONITOR) generate_monitor_tasks(OUTMONITOR,subsets);
