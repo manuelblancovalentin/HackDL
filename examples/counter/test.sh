@@ -12,3 +12,6 @@ cd ../../
 ./HackDL -n triplicated_module -s /home/mbv6231/CLionProjects/HackDL/examples/counter/tb.v \
   -l /home/mbv6231/CLionProjects/HackDL/examples/counter/ -o /home/mbv6231/CLionProjects/HackDL/examples/counter/tmr \
   --TMR 3 -p  "\bDF\d+.(Q|D)\b"
+
+
+  -n triplicated_module -s /Users/mbvalentin/CLionProjects/HackDL/examples/ECOND_ROC_DAQ/TB_ROC_DAQ_Control.sv -l /Users/mbvalentin/CLionProjects/HackDL/examples/ECOND_ROC_DAQ/ -o /Users/mbvalentin/CLionProjects/HackDL/examples/ECOND_ROC_DAQ/tmr --TMR 3 -p "\bDF\d+.(Q|D)\b"

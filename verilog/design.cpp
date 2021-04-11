@@ -201,6 +201,9 @@ Hierarchy Design::get_hierarchy() {
     // Create actual hierarchy object
     Hierarchy h(root);
 
+    // Remember to serialize
+    h.serialize_hierarchy(root);
+
     // Set hierarchy in Design (private)
     Design::__hierarchy__ = h;
 

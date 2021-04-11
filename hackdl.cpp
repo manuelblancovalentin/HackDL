@@ -36,7 +36,7 @@ int process(std::string NAME,
     // Check if json file exists
     Hierarchy h;
     std::ifstream json_stream(OUTJSON);
-    if (json_stream.fail() & !(flags & FLAGS::RELOAD)){
+    if (json_stream.fail() | !(flags & FLAGS::RELOAD)){
         // Init Design
         Design d(NAME, SOURCES, LIB, &flags);
         // Get hierarchy
@@ -57,7 +57,7 @@ int process(std::string NAME,
     std::vector<std::vector<std::string>> subsets = h.subset(PATTERNS);
 
     // Triplication of modules
-    if (flags & FLAGS::TMR) triplicate_modules(TMR, TMR_SUFFIX, subsets);
+    if (flags & FLAGS::TMR) triplicate_modules(TMR, subsets, h.get_sources(), TMR_SUFFIX);
 
     // Monitor tasks
     if (flags & FLAGS::MONITOR) generate_monitor_tasks(OUTMONITOR,subsets);

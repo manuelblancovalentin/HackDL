@@ -28,6 +28,8 @@ public:
     int save_json(std::string FILEPATH);
     int load_json(std::string FILEPATH);
 
+    std::map<std::string, std::string> get_sources();
+
     // Method to print tree
     void print(void) {std::cout << __hierarchy__; std::cout << std::endl; }
     int print_txt(std::string FILEPATH) {return __print__(__hierarchy__,FILEPATH);}

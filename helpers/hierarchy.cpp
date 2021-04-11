@@ -9,6 +9,11 @@
 #include "basic.h"
 #include <regex>
 
+std::map<std::string, std::string> Hierarchy::get_sources(){
+    return __serial_sources__;
+};
+
+
 // Load from json
 int Hierarchy::load_json(std::string FILEPATH){
     std::ifstream json_file(FILEPATH, std::ifstream::binary);
@@ -74,12 +79,12 @@ bool Hierarchy::serialize_hierarchy(const Json::Value& val,  std::string carry, 
 
                         __serial_instances__.push_back(carry_tmp);
 
-                        std::vector<std::string> nkeys = val[key].getMemberNames();
                         std::string next_src = parent_src;
-                        if (std::find(keys.begin(),nkeys.end(),"sourcefile_") != nkeys.end()){
+                        if (std::find(keys.begin(),keys.end(),"sourcefile_") != keys.end()){
                             next_src = val[key]["sourcefile_"].asString();
-                            __serial_sources__.insert(std::pair<std::string,std::string>(carry, next_src));
-                        } else if (!parent_src.empty()) {
+                            //__serial_sources__.insert(std::pair<std::string,std::string>(carry, next_src));
+                        }
+                        if (!parent_src.empty()) {
                             __serial_sources__.insert(std::pair<std::string,std::string>(carry, parent_src));
                         }
 
