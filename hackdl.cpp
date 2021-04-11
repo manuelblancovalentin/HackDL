@@ -34,19 +34,27 @@ int process(std::string NAME,
     }
 
     // Check if json file exists
+    std::map<std::string, VerilogBlock> mod_refs;
     Hierarchy h;
     std::ifstream json_stream(OUTJSON);
-    if (json_stream.fail() | !(flags & FLAGS::RELOAD)){
+    if (json_stream.fail() | !(flags & FLAGS::RELOAD) | (flags & FLAGS::TMR)){
         // Init Design
         Design d(NAME, SOURCES, LIB, &flags);
         // Get hierarchy
         h = d.get_hierarchy();
+
+        // TODO: serialize mod_refs and save to file so that we can load this later on
+        mod_refs = d.ModuleReferences;
+
         // Plot hierarchy to file
         h.save_json(OUTJSON);
     } else {
         // Load to obtain json hierarchy file
         h.load_json(OUTJSON);
     }
+
+
+
 
     // Print tree to console
     //h.print();
@@ -57,8 +65,10 @@ int process(std::string NAME,
     std::vector<std::vector<std::string>> subsets = h.subset(PATTERNS);
 
     // Triplication of modules
-    if (flags & FLAGS::TMR) triplicate_modules(TMR, subsets, h.get_instances(),
-                                               h.get_sources(), TMR_SUFFIX,
+    if (flags & FLAGS::TMR) triplicate_modules(TMR, subsets, mod_refs,
+                                               h.get_instances(),
+                                               h.get_sources(),
+                                               TMR_SUFFIX,
                                                OUTPATH);
 
     // Monitor tasks

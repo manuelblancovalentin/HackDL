@@ -32,6 +32,7 @@ public:
     std::vector <std::string> SOURCES;
     std::vector <std::string> LIB;
     std::vector <VerilogBlock> ModuleDefinitions;
+    std::map<std::string, VerilogBlock> ModuleReferences;
 
     // Get hierarchy definition
     Hierarchy get_hierarchy(void);

@@ -20,7 +20,7 @@ Hierarchy Design::get_hierarchy() {
     std::vector <VerilogBlock> module_definitions = Design::ModuleDefinitions;
 
     // Module references maps
-    std::map<std::string,VerilogBlock> module_references;
+    std::map<std::string,VerilogBlock> module_references = Design::ModuleReferences;
 
     // We will loop thru all filenames in source
     std::vector <std::string> src_left = Design::SOURCES;
@@ -206,6 +206,8 @@ Hierarchy Design::get_hierarchy() {
 
     // Set hierarchy in Design (private)
     Design::__hierarchy__ = h;
+    Design::ModuleDefinitions = module_definitions;
+    Design::ModuleReferences = module_references;
 
     // Return and exit
     return h;
