@@ -1,7 +1,7 @@
 
-<img src="./__res__/artwork/logo_blur.png" alt="drawing" width="400"/>
+<img src="./__res__/artwork/HackTMR.png" alt="drawing" width="400"/>
 
-# HackDL: a C++ tool for automated hardware description language manipulation
+# HackTMR: a C++ tool for automated hardware description language manipulation
 
 ## What is this for?
 This is missing
