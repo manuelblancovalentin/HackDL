@@ -9,7 +9,8 @@ ruby: 2.2.0
 before_install:
   - echo $LANG
   - echo $LC_ALL
-  - if [ $TRAVIS_OS_NAME == linux ]; then ./build/dependencies.sh; fi
+  - echo $TRAVIS_OS_NAME
+  - if [ $TRAVIS_OS_NAME == linux ]; then sudo ./build/dependencies.sh; fi
   - if [ $TRAVIS_OS_NAME == osx ]; then brew update && brew install cmake; fi
 script:
   - if [ $TRAVIS_OS_NAME == linux ]; then ./build.sh --cc=clang --cxx=clang++; fi
