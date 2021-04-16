@@ -57,10 +57,12 @@ Most designers have a pretty
 ## Installation
 
 ```bash
-$> git clone git@github.com/manuelblancovalentin/HackDL
+$> git clone git@github.com/manuelblancovalentin/HackTMR
 $> cd HackDL
-$> cmake .
-$> make clean && make all
+$> # Install dependencies
+$> chmod +x build.sh && chmod +x ./build/dependencies.sh
+$> ./build/dependencies.sh
+$> ./build.sh --cc=clang --cxx=clang++
 ```
 
 ## How to use
