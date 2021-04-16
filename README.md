@@ -1,12 +1,13 @@
 [![Build Status](https://travis-ci.com/manuelblancovalentin/HackTMR.svg?branch=master)](https://travis-ci.com/manuelblancovalentin/HackTMR)
 
-<table>
-<tr>
-    <td>
+<table cellspacing="0" cellpadding="0" style="border:none;">
+<tr cellspacing="0" cellpadding="0" style="border:none;">
+    <td cellspacing="0" cellpadding="0" style="border:none;">
         <img src="./res/artwork/HackTMR.png" alt="drawing" width="400"/>
     </td>
-    <td>
-        <h1>HackTMR: a C++ tool for automated hardware description language manipulation</h1>
+    <td cellspacing="0" cellpadding="0" style="border:none;">
+        <h1>HackTMR</h1> 
+        <h4>a C++ tool for automated hardware description language manipulation</h4>
     </td>
 </tr>
 </table>
