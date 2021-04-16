@@ -4,7 +4,7 @@ sudo apt-get update
 # Install gcc and other compilers
 sudo apt-get install build-essential
 #sudo apt install gcc-8 g++-8 gcc-9 g++-9 gcc-10 g++-10
-sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
 sudo apt update
 sudo apt install gcc-9 g++-9
 # install other dependencies
