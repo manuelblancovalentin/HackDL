@@ -1,9 +1,17 @@
 [![Build Status](https://travis-ci.com/manuelblancovalentin/HackTMR.svg?branch=master)](https://travis-ci.com/manuelblancovalentin/HackTMR)
 
+<table>
+<tr>
+    <td>
+        <img src="./res/artwork/HackTMR.png" alt="drawing" width="400"/>
+    </td>
+    <td>
+        <h1>HackTMR: a C++ tool for automated hardware description language manipulation</h1>
+    </td>
+</tr>
+</table>
 
-<img src="res/artwork/HackTMR.png" alt="drawing" width="400"/>
 
-# HackTMR: a C++ tool for automated hardware description language manipulation
 
 ## What is this for?
 HackTMR is a tool for automatic HLS manipulation. It allows the user 
