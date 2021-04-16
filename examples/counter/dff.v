@@ -1,8 +1,4 @@
 module dff(clk, rstb, in, D, Q, nQ);
-	
-	parameter N = 2;
-	parameter K = 4;
-	parameter J = 3;
 
 	// Define input buses and signals
 	input clk; // Clock signal
@@ -15,8 +11,6 @@ module dff(clk, rstb, in, D, Q, nQ);
 	output wire nQ; // ~Q
 
 	assign nQ = ~Q;
-
-    CBKF auto(.clk(clk));
 
 	always @(negedge rstb) begin
 		Q <= 1'b0;

@@ -4,9 +4,39 @@
 # HackTMR: a C++ tool for automated hardware description language manipulation
 
 ## What is this for?
-This is missing
+HackTMR is a tool for automatic HLS manipulation. It allows the user 
+to perform multiple tasks with the purpose of modifying, 
+enhancing or visualizing custom HLS code. 
+
+Although this tool is currently only accepting verilog/system-verilog 
+codes, we expect to expand it in the future to other languages
+such as VHDL. 
+
+The tool acts mainly as a (pseudo)compiler, parsing the HDL language 
+introduced by the user in order to get the hierarchy of the design first.
+Depending on the structure of the project, the top_design can be inferred
+automatically by HacKTMR. As it will be seen later, passing a testbench file
+where the top_module is instantiated usually renders the best performance
+while using this tool. 
+
+HackTMR is able to detect all verilog/systemverilog instructions, however 
+it currently ignores most behavioral blocks. As the original main purpose of this tool
+was to provide an easy way to visualize and modify structural data
+behavioral blocks were considered not essential (as it is always possible
+for the user to provide a gate-level description of the behavioral code and
+use that as input to HackTMR). We do expect to be able to parse these blocks in
+the future, but for now using and decoding them would slow down the execution of
+our tool, thus becoming counter-productive at the current stage of the software.
+
+The code is written in C++ and although it has some dependencies, we have tried to
+keep it as self-contained as possible. Writing it in C++ would allow users from any
+platform to compile, install and use it. 
+
+Below we introduce HackTMR functionalities and how to use them in your code.
 
 ### Hierarchy inspection
+Most designers have a pretty 
+
 > TODO
 ### Module renaming/extraction/deletion
 > TODO
