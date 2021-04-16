@@ -7,10 +7,12 @@ os:
   - linux
 ruby: 2.2.0
 before_install:
+  - chmod +x build.sh
+  - chmod +x ./build/dependencies.sh
   - echo $LANG
   - echo $LC_ALL
-  #- if [ $TRAVIS_OS_NAME == linux ]; then sudo ./build/dependencies.sh; fi
-  #- if [ $TRAVIS_OS_NAME == osx ]; then brew update && brew install cmake; fi
+  - if [ $TRAVIS_OS_NAME == linux ]; then sudo ./build/dependencies.sh; fi
+  - if [ $TRAVIS_OS_NAME == osx ]; then brew update && brew install cmake; fi
 script:
   - if [ $TRAVIS_OS_NAME == linux ]; then ./build.sh --cc=clang --cxx=clang++; fi
   - if [ $TRAVIS_OS_NAME == osx ]; then ./build.sh --cc=clang-3.8 --cxx=clang++-3.8; fi

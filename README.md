@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.com/manuelblancovalentin/HackTMR.svg?branch=master)](https://travis-ci.com/manuelblancovalentin/HackTMR)
+
 
 <img src="./__res__/artwork/HackTMR.png" alt="drawing" width="400"/>
 
