@@ -1458,7 +1458,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
     auto stop = std::chrono::high_resolution_clock::now();
 
     // Calculate time taken
-    auto duration = duration_cast<std::chrono::seconds>(stop - start);
+    auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop - start);
 
     // Populate VerilogBlock
     if (REF.empty()) REF = NAME;
