@@ -1,7 +1,7 @@
 [![Build Status](https://travis-ci.com/manuelblancovalentin/HackTMR.svg?branch=master)](https://travis-ci.com/manuelblancovalentin/HackTMR)
 
 
-<img src="./__res__/artwork/HackTMR.png" alt="drawing" width="400"/>
+<img src="res/artwork/HackTMR.png" alt="drawing" width="400"/>
 
 # HackTMR: a C++ tool for automated hardware description language manipulation
 
@@ -36,21 +36,6 @@ platform to compile, install and use it.
 
 Below we introduce HackTMR functionalities and how to use them in your code.
 
-### Hierarchy inspection
-Most designers have a pretty 
-
-> TODO
-### Module renaming/extraction/deletion
-> TODO
-
-### Triple Module Redundancy (TMR)
-> TODO
-
-###  Generation of signals monitor testbench
-> TODO
-
-### Single-Event Effects modeling 
-> TODO
 
 
 
@@ -67,10 +52,75 @@ $> ./build.sh --cc=clang --cxx=clang++
 
 ## How to use
 
-Simply call:
+In order to get a list with all the possible options and functionalities HackTMR has
+simply type:
 ```bash
-$> ./HackDL
+$> ./HackDL -h
 ```
+
+### Hierarchy inspection
+Most digital architectures have a pretty well idea of what the hierarchy of their
+HDL code looks like, but sometimes it might happen that our designs get so big that
+we need to take a look at the whole structure; or maybe we need to use or modify
+someone else's code.
+
+In those cases, it is useful to take a look at the structure of the design. Although
+you can see this hierachy using property tools like Cadence Genus, Xcelium or others,
+these tools are usually installed in a single server to which we might not necessarily
+have access at all times. Apart from that, if that specific code is not compilable,
+those tools will not allow you to visualize the structure. Furthermore, if your code is
+missing some libraries or files, it is impossible to use such tools to check the hierarchy
+of the design.
+
+HackTMR offers HDL designers the ability to parse a set of HDL codes and display the
+hierarchy of the design even if the code is not compilable or it has missing libraries
+or files. Our software has been optimized to run as fast as possible, so that such tasks
+can be executed rapidly and efficiently in order to guarantee that the design workflow can
+move forward.
+
+The easiest way to get the hierarchy of a certain design is to point HackTMR to
+such file with the ``--source`` or ``-s`` flag. This flag should point to a
+``verilog`` or ``systemverilog`` file containing the top_module (although it
+can contain any other modules apart from the top).
+
+If such file has dependencies on other files, and uses instructions such as
+`` `include <other_file>.{v | sv} `` then you need to specify the path or paths
+to the folders where these files can be found and HackTMR will look for them
+automatically. This path can be specified with the ``--library`` or ``-l``
+flag.
+
+Any instruction passed to HackTMR will generate some outputs. The outputs
+will be stored in the directory pointed by the flag ``--output`` or ``-o``.
+If not specified, the software will try to create a new directory in the
+current working directory.
+
+The name of the outputs can also be specified using the ``--name`` or ``-n``
+flag.
+
+Thus, the pattern for an instruction to get the hierarchy of a design is
+shown below:
+
+```bash
+$> HackDL -n <out_name> 
+          -s <path_file_top_design>.{v | sv}
+          -l <path_to_sources> 
+          -o <output_path>
+```
+
+For a particular example see [this](./doc/basics.md).
+
+
+### Module renaming/extraction/deletion
+> TODO
+
+### Triple Module Redundancy (TMR)
+> TODO
+
+###  Generation of signals monitor testbench
+> TODO
+
+### Single-Event Effects modeling
+> TODO
 
 
 
@@ -98,263 +148,6 @@ Say that we find the start of a block comment ``/*``, we know that we have to ke
 | Multi-line comment | ``\* example *\`` |  ``\*`` | ``*\`` |✅|
 
 
-## Example: Counter
-
-```
-top_modules
- └---counter_tb
-     ├---C1
-     │   ├---D0
-     │   │   ├---arrayspan : [0:0]
-     │   │   ├---bitspan : [0:0]
-     │   │   ├---type : wire
-     │   │   └---value : 
-     │   ├---D1
-     │   │   ├---arrayspan : [0:0]
-     │   │   ├---bitspan : [0:0]
-     │   │   ├---type : wire
-     │   │   └---value : 
-     │   ├---D2
-     │   │   ├---arrayspan : [0:0]
-     │   │   ├---bitspan : [0:0]
-     │   │   ├---type : wire
-     │   │   └---value : 
-     │   ├---DF0
-     │   │   ├---D
-     │   │   │   ├---arrayspan : [0:0]
-     │   │   │   ├---bitspan : [0:0]
-     │   │   │   ├---type : wire
-     │   │   │   └---value : 
-     │   │   ├---Q
-     │   │   │   ├---arrayspan : [0:0]
-     │   │   │   ├---bitspan : [0:0]
-     │   │   │   ├---type : reg
-     │   │   │   └---value : 
-     │   │   ├---clk
-     │   │   │   ├---arrayspan : [0:0]
-     │   │   │   ├---bitspan : [0:0]
-     │   │   │   ├---type : wire
-     │   │   │   └---value : 
-     │   │   ├---in
-     │   │   │   ├---arrayspan : [0:0]
-     │   │   │   ├---bitspan : [0:0]
-     │   │   │   ├---type : wire
-     │   │   │   └---value : 
-     │   │   ├---nQ
-     │   │   │   ├---arrayspan : [0:0]
-     │   │   │   ├---bitspan : [0:0]
-     │   │   │   ├---type : wire
-     │   │   │   └---value : 
-     │   │   ├---parameters
-     │   │   │   ├---J : = 3
-     │   │   │   ├---K : = 4
-     │   │   │   └---N : = 2
-     │   │   ├---ports
-     │   │   │   ├---inout : 6
-     │   │   │   ├---input
-     │   │   │   │   ├---0 : clk
-     │   │   │   │   ├---1 : rstb
-     │   │   │   │   ├---2 : in
-     │   │   │   │   └---3 : D
-     │   │   │   └---output
-     │   │   │       ├---0 : Q
-     │   │   │       └---1 : nQ
-     │   │   ├---ref : dff
-     │   │   └---rstb
-     │   │       ├---arrayspan : [0:0]
-     │   │       ├---bitspan : [0:0]
-     │   │       ├---type : wire
-     │   │       └---value : 
-     │   ├---DF1
-     │   │   ├---D
-     │   │   │   ├---arrayspan : [0:0]
-     │   │   │   ├---bitspan : [0:0]
-     │   │   │   ├---type : wire
-     │   │   │   └---value : 
-     │   │   ├---Q
-     │   │   │   ├---arrayspan : [0:0]
-     │   │   │   ├---bitspan : [0:0]
-     │   │   │   ├---type : reg
-     │   │   │   └---value : 
-     │   │   ├---clk
-     │   │   │   ├---arrayspan : [0:0]
-     │   │   │   ├---bitspan : [0:0]
-     │   │   │   ├---type : wire
-     │   │   │   └---value : 
-     │   │   ├---in
-     │   │   │   ├---arrayspan : [0:0]
-     │   │   │   ├---bitspan : [0:0]
-     │   │   │   ├---type : wire
-     │   │   │   └---value : 
-     │   │   ├---nQ
-     │   │   │   ├---arrayspan : [0:0]
-     │   │   │   ├---bitspan : [0:0]
-     │   │   │   ├---type : wire
-     │   │   │   └---value : 
-     │   │   ├---parameters
-     │   │   │   ├---J : = 3
-     │   │   │   ├---K : = 4
-     │   │   │   └---N : = 2
-     │   │   ├---ports
-     │   │   │   ├---inout : 6
-     │   │   │   ├---input
-     │   │   │   │   ├---0 : clk
-     │   │   │   │   ├---1 : rstb
-     │   │   │   │   ├---2 : in
-     │   │   │   │   └---3 : D
-     │   │   │   └---output
-     │   │   │       ├---0 : Q
-     │   │   │       └---1 : nQ
-     │   │   ├---ref : dff
-     │   │   └---rstb
-     │   │       ├---arrayspan : [0:0]
-     │   │       ├---bitspan : [0:0]
-     │   │       ├---type : wire
-     │   │       └---value : 
-     │   ├---DF2
-     │   │   ├---D
-     │   │   │   ├---arrayspan : [0:0]
-     │   │   │   ├---bitspan : [0:0]
-     │   │   │   ├---type : wire
-     │   │   │   └---value : 
-     │   │   ├---Q
-     │   │   │   ├---arrayspan : [0:0]
-     │   │   │   ├---bitspan : [0:0]
-     │   │   │   ├---type : reg
-     │   │   │   └---value : 
-     │   │   ├---clk
-     │   │   │   ├---arrayspan : [0:0]
-     │   │   │   ├---bitspan : [0:0]
-     │   │   │   ├---type : wire
-     │   │   │   └---value : 
-     │   │   ├---in
-     │   │   │   ├---arrayspan : [0:0]
-     │   │   │   ├---bitspan : [0:0]
-     │   │   │   ├---type : wire
-     │   │   │   └---value : 
-     │   │   ├---nQ
-     │   │   │   ├---arrayspan : [0:0]
-     │   │   │   ├---bitspan : [0:0]
-     │   │   │   ├---type : wire
-     │   │   │   └---value : 
-     │   │   ├---parameters
-     │   │   │   ├---J : = 3
-     │   │   │   ├---K : = 4
-     │   │   │   └---N : = 2
-     │   │   ├---ports
-     │   │   │   ├---inout : 6
-     │   │   │   ├---input
-     │   │   │   │   ├---0 : clk
-     │   │   │   │   ├---1 : rstb
-     │   │   │   │   ├---2 : in
-     │   │   │   │   └---3 : D
-     │   │   │   └---output
-     │   │   │       ├---0 : Q
-     │   │   │       └---1 : nQ
-     │   │   ├---ref : dff
-     │   │   └---rstb
-     │   │       ├---arrayspan : [0:0]
-     │   │       ├---bitspan : [0:0]
-     │   │       ├---type : wire
-     │   │       └---value : 
-     │   ├---DF3
-     │   │   ├---D
-     │   │   │   ├---arrayspan : [0:0]
-     │   │   │   ├---bitspan : [0:0]
-     │   │   │   ├---type : wire
-     │   │   │   └---value : 
-     │   │   ├---Q
-     │   │   │   ├---arrayspan : [0:0]
-     │   │   │   ├---bitspan : [0:0]
-     │   │   │   ├---type : reg
-     │   │   │   └---value : 
-     │   │   ├---clk
-     │   │   │   ├---arrayspan : [0:0]
-     │   │   │   ├---bitspan : [0:0]
-     │   │   │   ├---type : wire
-     │   │   │   └---value : 
-     │   │   ├---in
-     │   │   │   ├---arrayspan : [0:0]
-     │   │   │   ├---bitspan : [0:0]
-     │   │   │   ├---type : wire
-     │   │   │   └---value : 
-     │   │   ├---nQ
-     │   │   │   ├---arrayspan : [0:0]
-     │   │   │   ├---bitspan : [0:0]
-     │   │   │   ├---type : wire
-     │   │   │   └---value : 
-     │   │   ├---parameters
-     │   │   │   ├---J : = 3
-     │   │   │   ├---K : = 4
-     │   │   │   └---N : = 2
-     │   │   ├---ports
-     │   │   │   ├---inout : 6
-     │   │   │   ├---input
-     │   │   │   │   ├---0 : clk
-     │   │   │   │   ├---1 : rstb
-     │   │   │   │   ├---2 : in
-     │   │   │   │   └---3 : D
-     │   │   │   └---output
-     │   │   │       ├---0 : Q
-     │   │   │       └---1 : nQ
-     │   │   ├---ref : dff
-     │   │   └---rstb
-     │   │       ├---arrayspan : [0:0]
-     │   │       ├---bitspan : [0:0]
-     │   │       ├---type : wire
-     │   │       └---value : 
-     │   ├---Q
-     │   │   ├---arrayspan : [0:0]
-     │   │   ├---bitspan : [3:0]
-     │   │   ├---type : wire
-     │   │   └---value : 
-     │   ├---clk
-     │   │   ├---arrayspan : [0:0]
-     │   │   ├---bitspan : [0:0]
-     │   │   ├---type : wire
-     │   │   └---value : 
-     │   ├---in
-     │   │   ├---arrayspan : [0:0]
-     │   │   ├---bitspan : [0:0]
-     │   │   ├---type : wire
-     │   │   └---value : 
-     │   ├---ports
-     │   │   ├---inout : 6
-     │   │   ├---input
-     │   │   │   ├---0 : clk
-     │   │   │   ├---1 : in
-     │   │   │   └---2 : rstb
-     │   │   └---output
-     │   │       └---0 : Q
-     │   ├---ref : counter
-     │   └---rstb
-     │       ├---arrayspan : [0:0]
-     │       ├---bitspan : [0:0]
-     │       ├---type : wire
-     │       └---value : 
-     ├---Q
-     │   ├---arrayspan : [0:0]
-     │   ├---bitspan : [3:0]
-     │   ├---type : wire
-     │   └---value : 
-     ├---clk
-     │   ├---arrayspan : [0:0]
-     │   ├---bitspan : [0:0]
-     │   ├---type : reg
-     │   └---value : 
-     ├---in
-     │   ├---arrayspan : [0:0]
-     │   ├---bitspan : [0:0]
-     │   ├---type : reg
-     │   └---value : 
-     ├---ref : module
-     └---rstb
-         ├---arrayspan : [0:0]
-         ├---bitspan : [0:0]
-         ├---type : reg
-         └---value : 
-         
-```
 
 ## Citing us
 Please, consider citing us in your publications if you found this code useful. If so, please use the following bib entry:
