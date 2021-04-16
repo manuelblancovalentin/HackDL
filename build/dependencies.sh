@@ -1,6 +1,8 @@
 #!/bin/bash
 
 sudo apt-get update
+# Install make
+sudo apt install make
 # Install cmake
 export CMAKE_VERSION=3.20.1
 wget https://github.com/Kitware/CMake/releases/download/v$CMAKE_VERSION/cmake-$CMAKE_VERSION.tar.gz
