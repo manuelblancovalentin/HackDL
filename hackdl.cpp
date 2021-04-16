@@ -106,7 +106,7 @@ int main(int argc, char* argv[])
     args::Flag reload(parser, "reload", "Reload the hierarchy in case found in disk", {"reload"});
     args::Flag auto_include(parser, "auto-include", "Automatically include and parse files when an `include directive is found", {"auto-include"});
     args::Flag monitor(parser, "monitor", "Generate monitor v files on subset defined by reg ex patterns", {"monitor"});
-    args::Flag see(parser, "see", "Generate see tasks v files on subset defined by reg ex patterns", {"SEE"});
+    args::Flag see(parser, "see", "Generate see tasks v files on subset defined by reg ex patterns", {"SEE","see"});
 
     // TMR
     args::ValueFlag<int> tmr(parser, "tmr", "Triplicate modules defined as subset by reg ex patterns\n\t0 -> No "
@@ -116,7 +116,7 @@ int main(int argc, char* argv[])
 
     // Sources
     args::ValueFlagList<std::string> sources(parser, "source", "List of sources", {'s',"source"});
-    args::ValueFlagList<std::string> libs(parser, "lib", "List of libs", {'l',"lib"});
+    args::ValueFlagList<std::string> dependencies(parser, "dependencies", "List of dependencies", {'d',"dependencies"});
 
     // Outpath
     args::ValueFlag<std::string> outpath(parser, "outpath", "Path of output results", {'o',"output"});
@@ -170,7 +170,7 @@ int main(int argc, char* argv[])
     if (see) { flags |= FLAGS::SEE;}
     if (sources) { for (const auto s: args::get(sources)) {SOURCES.push_back(s);}; }
     if (outpath) {OUTPATH = args::get(outpath);}
-    if (libs) { for (const auto l: args::get(libs)) {LIB.push_back(l);}; }
+    if (dependencies) { for (const auto l: args::get(dependencies)) {LIB.push_back(l);}; }
     if (patterns) { for (const auto p: args::get(patterns)) {PATTERNS.push_back(p);}; }
 
     // TMR params
