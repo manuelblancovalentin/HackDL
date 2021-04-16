@@ -1,6 +1,8 @@
 #!/bin/bash
 
 sudo apt-get update
+# Install gcc and other compilers
+sudo apt-get install build-essential
 # Install make
 sudo apt install make
 # Install cmake
