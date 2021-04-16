@@ -7,6 +7,7 @@
 #include <random>
 #include "design.h"
 #include <algorithm>
+#include <filesystem>
 
 void triplicate_modules(int TMR,
                         std::vector<std::vector<std::string>>& subsets,
