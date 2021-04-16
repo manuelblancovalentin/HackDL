@@ -4,8 +4,8 @@ sudo apt-get update
 # Install cmake
 export CMAKE_VERSION=3.20.1
 wget https://github.com/Kitware/CMake/releases/download/v$CMAKE_VERSION/cmake-$CMAKE_VERSION.tar.gz
-tar -zxvf cmake-$CMAKE_VERSION.tar.gz
-cd cd cmake-$CMAKE_VERSION
+tar -zxf cmake-$CMAKE_VERSION.tar.gz
+cd cmake-$CMAKE_VERSION
 sudo ./bootsrap
 make
 make install
