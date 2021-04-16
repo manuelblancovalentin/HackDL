@@ -1,3 +1,3 @@
 #!/bin/bash
 
-./cmake . && make clean && make all
+cmake . && make clean && make all
