@@ -58,7 +58,7 @@ Most designers have a pretty
 
 ```bash
 $> git clone git@github.com/manuelblancovalentin/HackTMR
-$> cd HackDL
+$> cd HackTMR
 $> # Install dependencies
 $> chmod +x build.sh && chmod +x ./build/dependencies.sh
 $> ./build/dependencies.sh
