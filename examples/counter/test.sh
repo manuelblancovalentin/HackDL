@@ -1,17 +1,39 @@
 #!/bin/bash
 
-cd ../../
-./HackDL -n COUNTER -s /Users/mbvalentin/CLionProjects/HackDL/examples/counter/tb.v \
-              -l /Users/mbvalentin/CLionProjects/HackDL/examples/counter/ \
-              -o /Users/mbvalentin/CLionProjects/HackDL/examples/counter/
-              -p  "\bDF\d+.(Q|D)\b" \
-              --monitor \
-              --SEE --sim-pulses 2 --max-upset-time 10 --min-upset-time 1
+cd ../../cmake-build-debug/
+echo "Performing Full-TMR on counter module..."
+./HackDL -n COUNTER -s /Users/mbvalentin/CLionProjects/HackDL/examples/counter/counter.v \
+              -d /Users/mbvalentin/CLionProjects/HackDL/examples/counter/ \
+              -o /Users/mbvalentin/CLionProjects/HackDL/examples/counter/tmrfull \
+              -p  "\bC\d+$" \
+              --TMR full
+#--monitor \
+#--SEE --sim-pulses 2 --max-upset-time 10 --min-upset-time 1
 
-# FF TMR
-./HackDL -n triplicated_module -s /home/mbv6231/CLionProjects/HackDL/examples/counter/tb.v \
-  -l /home/mbv6231/CLionProjects/HackDL/examples/counter/ -o /home/mbv6231/CLionProjects/HackDL/examples/counter/tmr \
-  --TMR 3 -p  "\bDF\d+.(Q|D)\b"
+echo "Performing logic triplication on counter module..."
+./HackDL -n COUNTER -s /Users/mbvalentin/CLionProjects/HackDL/examples/counter/counter.v \
+              -d /Users/mbvalentin/CLionProjects/HackDL/examples/counter/ \
+              -o /Users/mbvalentin/CLionProjects/HackDL/examples/counter/tmrlogic \
+              -p  "\bC\d+$" \
+              --TMR logic
 
+echo "Performing clk skew triplication on counter module..."
+./HackDL -n COUNTER -s /Users/mbvalentin/CLionProjects/HackDL/examples/counter/counter.v \
+              -d /Users/mbvalentin/CLionProjects/HackDL/examples/counter/ \
+              -o /Users/mbvalentin/CLionProjects/HackDL/examples/counter/tmrclk \
+              -p  "\bC\d+$" \
+              --TMR clk
 
-  -n triplicated_module -s /Users/mbvalentin/CLionProjects/HackDL/examples/ECOND_ROC_DAQ/TB_ROC_DAQ_Control.sv -l /Users/mbvalentin/CLionProjects/HackDL/examples/ECOND_ROC_DAQ/ -o /Users/mbvalentin/CLionProjects/HackDL/examples/ECOND_ROC_DAQ/tmr --TMR 3 -p "\bDF\d+.(Q|D)\b"
+echo "Performing output triplication on counter module..."
+./HackDL -n COUNTER -s /Users/mbvalentin/CLionProjects/HackDL/examples/counter/counter.v \
+              -d /Users/mbvalentin/CLionProjects/HackDL/examples/counter/ \
+              -o /Users/mbvalentin/CLionProjects/HackDL/examples/counter/tmrout \
+              -p  "\bC\d+$" \
+              --TMR out
+
+echo "Performing input triplication on counter module..."
+./HackDL -n COUNTER -s /Users/mbvalentin/CLionProjects/HackDL/examples/counter/counter.v \
+              -d /Users/mbvalentin/CLionProjects/HackDL/examples/counter/ \
+              -o /Users/mbvalentin/CLionProjects/HackDL/examples/counter/tmrin \
+              -p  "\bC\d+$" \
+              --TMR in

@@ -8,6 +8,7 @@
 #include <iostream>
 #include <climits>
 #include <filesystem>
+#include <fstream>
 
 
 // Get hierarchy method
@@ -190,6 +191,9 @@ Hierarchy Design::get_hierarchy() {
     //std::cout << hierarchy << std::endl;
 
     // Transform this to Json::Value
+    //std::ofstream out("output.txt");
+    //out << hierarchy;
+    //out.close();
     Json::Value root;
     Json::Reader reader;
     bool parsingSuccessful = reader.parse( hierarchy.c_str(), root );     //parse process

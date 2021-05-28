@@ -31,7 +31,7 @@ void progressBar::printProgress(int iter, std::string message, std::string prefi
     // Print empty
     for (int i = lpad; i < PBWIDTH; i++) std::cout << PBAREMPTYCHAR;
     // Print end of line
-    std::cout << "] - " << message;
+    std::cout << "] - " << message << std::endl;
 
     // Flush cout
     fflush(stdout);

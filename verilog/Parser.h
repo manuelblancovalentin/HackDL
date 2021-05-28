@@ -26,7 +26,7 @@ private:
                            int& start_line,
                            std::vector <std::string>& ancestors,
                            std::vector <std::string>& children,
-                           std::string previous_line = "",
+                           std::string prev_block = "",
                            std::string TAB = "",
                            std::string NAME = "block",
                            std::string REF = "",
@@ -59,7 +59,7 @@ public:
     int line_offset = 0;
 
     // Initialization
-    Parser(std::string FILENAME = "",
+    explicit Parser(std::string FILENAME = "",
            std::string NAME = "block",
            FLAGS* flags = new FLAGS()):
                 FILENAME(FILENAME),
@@ -82,6 +82,49 @@ public:
 };
 
 bool LineChecker(std::string mainStr, std::vector<std::string> patterns, int n_patterns);
+
+
+class LineParser{
+    public:
+
+};
+
+
+
+class BlockCommentParser {
+public:
+    std::string content = "";
+    std::ifstream& stream;
+    int start_line = 0;
+    int end_line = 0;
+
+    // Parse
+    std::string parse(progressBar& pbar, std::string TAB = "");
+
+    // Initializer
+    explicit BlockCommentParser(std::ifstream& stream, std::string content="", int start_line = 0):
+        stream(stream),
+        content(content),
+        start_line(start_line){}
+};
+
+
+class BlockBeginEnd {
+public:
+    std::string content = "";
+    std::ifstream& stream;
+    int start_line = 0;
+    int end_line = 0;
+
+    // Parse
+    std::string parse(progressBar& pbar, std::string TAB = "");
+
+    // Initializer
+    explicit BlockBeginEnd(std::ifstream& stream, std::string content="", int start_line = 0):
+            stream(stream),
+            content(content),
+            start_line(start_line){}
+};
 
 
 template<class InputIterator, class T>

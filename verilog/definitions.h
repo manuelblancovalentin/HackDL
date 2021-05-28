@@ -297,7 +297,44 @@ std::vector __VLOG_ALL_KEYWORDS__ = {"and", "buf", "bufif0", "bufif1", "nand", "
                                      "casex", "casez", "endcase", "endgenerate", "endconfig", "endprimitive", "endspecify",
                                      "endtable", "endtask", "automatic", "cell", "begin", "end", "struct"};
 int __VLOG_NUM_KEYWORDS__ = 116;
-std::regex __VLOG_INSTANCE_PATTERN__("\\b(?!and|buf|bufif0|bufif1|nand|nor|not|or|xnor|xor|pulldown|pullup|notif0|notif1|cmos|nmos|pmos|remos|rnmos|rpmos|rtran|rtranif0|rtranif1|tran|tranif0|tranif1|assign|deassign|defparam|design|default|instance|disable|force|genvar|release|event|wait|specparam|edge|showcancelled|noshowcancelled|pulsestyle_oneventglitch|pulsestyle_ondetectglitch|input|output|inout|int|logic|string|integer|real|realtime|reg|time|wire|supply0|supply1|tri|triand|trior|tri0|tri1|wand|wor|trireg|struct|begin|end|if|else|initial|always|for|while|do|repeat|forever|ifnone|repeat|always_comb|always_ff|always_latch|localparam|parameter|module|macromodule|endmodule|function|task|fork|case|casex|casez|generate|config|primitive|specify|table|task|join|case|casex|casez|endcase|endgenerate|endconfig|endprimitive|endspecify|endtable|endtask|automatic|cell|begin|end|struct)\\b([a-zA-Z0-9_]+){1}\\s+(\\#\\([^\\)]+\\))?\\s*([a-zA-Z0-9_]+){1}\\s*(\\([^\\;]+\\))?\\s*\\;");
+std::regex __VLOG_INSTANCE_PATTERN__("\\b(?!and|buf|bufif0|bufif1|nand|nor|not|or|xnor|xor|pulldown|pullup|notif0|notif1|cmos|nmos|pmos|remos|rnmos|rpmos|rtran|rtranif0|rtranif1|tran|tranif0|tranif1|assign|deassign|defparam|design|default|instance|disable|force|genvar|release|event|wait|specparam|edge|showcancelled|noshowcancelled|pulsestyle_oneventglitch|pulsestyle_ondetectglitch|input|output|inout|int|logic|string|integer|real|realtime|reg|time|wire|supply0|supply1|tri|triand|trior|tri0|tri1|wand|wor|trireg|struct|begin|end|if|else|initial|always|for|while|do|repeat|forever|ifnone|repeat|always_comb|always_ff|always_latch|localparam|parameter|module|macromodule|endmodule|function|task|fork|case|casex|casez|generate|config|primitive|specify|table|task|join|case|casex|casez|endcase|endgenerate|endconfig|endprimitive|endspecify|endtable|endtask|automatic|cell|begin|end|struct)\\b([a-zA-Z0-9_\\\\[\\]]+){1}\\s+(\\#\\([^\\)]+\\))?\\s*([a-zA-Z0-9_\\\\[\\]]+){1}\\s*(\\([^\\;]+\\))?\\s*\\;");
+
+
+#ifndef DEFINE_ENUM_FLAG_OPERATORS
+#define DEFINE_ENUM_FLAG_OPERATORS(ENUMTYPE) \
+extern "C++" { \
+inline ENUMTYPE operator | (ENUMTYPE a, ENUMTYPE b) { return ENUMTYPE(((int)a) | ((int)b)); } \
+inline ENUMTYPE &operator |= (ENUMTYPE &a, ENUMTYPE b) { return (ENUMTYPE &)(((int &)a) |= ((int)b)); } \
+inline ENUMTYPE operator & (ENUMTYPE a, ENUMTYPE b) { return ENUMTYPE(((int)a) & ((int)b)); } \
+inline ENUMTYPE &operator &= (ENUMTYPE &a, ENUMTYPE b) { return (ENUMTYPE &)(((int &)a) &= ((int)b)); } \
+inline ENUMTYPE operator ~ (ENUMTYPE a) { return ENUMTYPE(~((int)a)); } \
+inline ENUMTYPE operator ^ (ENUMTYPE a, ENUMTYPE b) { return ENUMTYPE(((int)a) ^ ((int)b)); } \
+inline ENUMTYPE &operator ^= (ENUMTYPE &a, ENUMTYPE b) { return (ENUMTYPE &)(((int &)a) ^= ((int)b)); } \
+}
+#else
+#define DEFINE_ENUM_FLAG_OPERATORS(ENUMTYPE) // NOP, C allows these operators.
+#endif
+
+// Definition of verilog Parser groups
+// Powers of two so we ensure that each variable has one single bit
+// and so we can compare them and operate with them individually
+// (such as xor, and, or, etc).
+typedef enum _VLOG_GROUPS_ {
+    // Decimal            // Binary
+    INVALID = 0,    // 0000000000
+    COMMENT = 1,    // 0000000001
+    MODULE = 2,     // 0000000010
+    NONNESTABLE = 4,// 0000000100
+    BEGINEND = 8,   // 0000001000
+    NETWIRES = 16,  // 0000010000
+    PARAMETER = 32, // 0000100000
+    ASSIGN = 64,    // 0001000000
+    STRUCT = 128,   // 0010000000
+    FUNCTION = 256, // 0100000000
+    INSTANCE = 512  // 1000000000
+} VLOG_GROUPS_;
+
+DEFINE_ENUM_FLAG_OPERATORS(FLAGS);
 
 
 #endif //HLSPY_DEFINITIONS_H

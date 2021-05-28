@@ -18,7 +18,7 @@ int process(std::string NAME,
             std::string OUTPATH,
             std::vector<std::string> PATTERNS,
             int SIM_PULSES = 1, int MAX_UPSET_TIME = 10, int MIN_UPSET_TIME = 1,
-            int TMR = 0, std::string TMR_SUFFIX = "TMR"){
+            std::vector <std::string> TMR = {}, std::string TMR_SUFFIX = "TMR"){
 
     // Build outfile
     if (endsWith(OUTPATH,PATH_SEPARATOR)) {OUTPATH = OUTPATH.substr(0,OUTPATH.size()-1);}
@@ -94,7 +94,7 @@ int main(int argc, char* argv[])
     int MAX_UPSET_TIME = 10;
     int MIN_UPSET_TIME = 1;
     std::string TMR_SUFFIX = "TMR";
-    int TMR = 0;
+    std::vector <std::string> TMR;
 
     // Setup flags
     FLAGS flags(FLAGS::NONE);
@@ -109,10 +109,14 @@ int main(int argc, char* argv[])
     args::Flag see(parser, "see", "Generate see tasks v files on subset defined by reg ex patterns", {"SEE","see"});
 
     // TMR
-    args::ValueFlag<int> tmr(parser, "tmr", "Triplicate modules defined as subset by reg ex patterns\n\t0 -> No "
-                                       "triplication "
-                                  "(Default mode)\n\t1 -> Only Registers\n\t2 -> Registers and clock\n\t3 -> Full "
-                                  "TMR\n\t4 -> Clock skewing TMR (beta)", {"TMR"});
+    args::ValueFlagList<std::string> tmr(parser, "tmr", "List of entities to triplicate it can be one or more of the values from"
+                                                        "the following list:\n\t{ { in |& out |& clk } | full }\n"
+                                                        "\t\tin: triplicate inputs"
+                                                        "\t\tout: triplicate outputs"
+                                                        "\t\tclk: triplicate clocks"
+                                                        "\t\tfull: if FULL is set, then the I/Os are changed accordingly."
+                                                        " If not, the block interacts with the rest of the circuit"
+                                                        " the same way it did prior to triplication. ", {"TMR","tmr"});
 
     // Sources
     args::ValueFlagList<std::string> sources(parser, "source", "List of sources", {'s',"source"});
@@ -174,10 +178,7 @@ int main(int argc, char* argv[])
     if (patterns) { for (const auto p: args::get(patterns)) {PATTERNS.push_back(p);}; }
 
     // TMR params
-    if (tmr) {
-        flags |= FLAGS::TMR;
-        TMR = args::get(tmr);
-    }
+    if (tmr) { flags |= FLAGS::TMR; for (const auto s: args::get(tmr)) {TMR.push_back(s);}; }
     if (tmr_suffix) {TMR_SUFFIX = args::get(tmr_suffix);}
 
     // SEE params

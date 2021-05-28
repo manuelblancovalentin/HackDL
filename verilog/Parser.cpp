@@ -53,7 +53,7 @@ VerilogBlock Parser::__parse_file__(std::vector <VerilogBlock>& module_definitio
         nlines = __count_number_lines__(FILENAME.c_str());
 
         // Print header
-        std::cout << TAB << "[INFO] - Reading source file: '" << FILENAME << "' with a total of " << nlines
+        std::cout << std::endl << "\n" + TAB << "[INFO] - Reading source file: '" << FILENAME << "' with a total of " << nlines
                   << " lines" << std::endl;
 
     }
@@ -69,7 +69,7 @@ VerilogBlock Parser::__parse_file__(std::vector <VerilogBlock>& module_definitio
                                              stream, pbar,
                                              start_line, ancestors, children,
                                              "",
-                                             TAB, NAME, "",
+                                             TAB + "\t", NAME, "",
                                              FILENAME);
 
     // Close stream
@@ -89,7 +89,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                                int& start_line,
                                std::vector <std::string>& ancestors,
                                std::vector <std::string>& children,
-                               std::string prev_line,
+                               std::string prev_block,
                                std::string TAB,
                                std::string NAME,
                                std::string REF,
@@ -137,23 +137,77 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
     // Initialize vars to keep track of line_cursor
     int end_line = start_line;
 
+    // Let's say that we detect the initial of a multiline comment.
+    // We know that we will have to keep appending lines to the content,
+    // until another block is opened (like an always, module, etc.)
+    // Now, if we just append the lines, that means that every iteration
+    // the number of lines to be parsed will increase linearly. E.g.,
+    // the algorithm will have to process 1 line in the first iteration,
+    // 2 lines in the next iteration, 3 in the following, etc.
+    // If we don't do something about it, the processing time will increase
+    // unnecessarily (because we already know that the previous 0..i-1 lines
+    // are comments. So let's use an integer as an index of the starting point
+    // of the current line at which we must start parsing. In this case, this
+    // will make that at iteration "i" we only parse the new line (that hasn't been
+    // appended yet), instead of the cumulative text. This is expected to
+    // speed up computation time DRAMATICALLY, specially cause we are using regex.
+    // This also means that we have to keep track of the group we are currently parsing
+    // (like, comment group, always group, etc.)
+    int st = 0;
+    _VLOG_GROUPS_ CURRENT_GROUP(_VLOG_GROUPS_::INVALID);
+
     // Loop until we reach end of lines
     while (!stream.eof()) //!stream.eof()
     {
-        // read next line
-        getline(stream, line);
 
-        // Increase iline
-        end_line++;
+        if (prev_block.empty()){
+            // If the previous block is empty we for sure need to process the new line
+            getline(stream, line);
+
+            // Increase iline
+            end_line++;
+            start_line = end_line;
+
+            // Set state to invalid (cause we don't know what it is yet)
+            CURRENT_GROUP = _VLOG_GROUPS_::INVALID;
+
+        } else {
+            // Line is prev_block if block is invalid, else read new line
+            if (CURRENT_GROUP & _VLOG_GROUPS_::INVALID){
+                line = prev_block;
+
+                // Remove prev_block
+                prev_block = "";
+            } else if (CURRENT_GROUP & _VLOG_GROUPS_::INSTANCE){
+                // Read line but do not append
+                getline(stream, line);
+
+                // Increase iline
+                end_line++;
+                start_line = end_line;
+
+            } else {
+                getline(stream, line);
+
+                // Increase iline
+                end_line++;
+                start_line = end_line;
+
+                line = prev_block + "\n" + line;
+            }
+
+
+        }
+
 
         // Append previous line to this line
-        if (prev_line.empty()) {
-            start_line = end_line;
-        }
-        line = prev_line + "\n" + line;
+        //if (prev_block.empty()) {
+        //    start_line = end_line;
+        //}
+        //line = prev_block + "\n" + line;
 
-        // Make sure to erase prev_line (this could be a potential cause of error down the line)
-        prev_line = "";
+        // Make sure to erase prev_block (this could be a potential cause of error down the line)
+        //prev_block = "";
 
         // Left-trim the line
         ltrim(line);
@@ -177,10 +231,13 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
             // This is a single-line comment
             start_line = end_line;
 
-            message = string_format("Comment found at line %d (ignored)\n", end_line + line_offset);
-            prev_line = "";
+            message = string_format("Comment found at line %d (ignored)", end_line + line_offset);
+            //prev_block = ""; // Just by not assigning this to prev_block, we are ignoring it
             line = "";
             force_print = false;
+
+            // Group tracker (appender)
+            CURRENT_GROUP = _VLOG_GROUPS_::INVALID;
 
         } else if (stringStartsWith(line, "`")) {
             if (stringStartsWith(line, "`include")) {
@@ -193,7 +250,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                 // Find "
                 std::size_t pos = line.find('"');
                 message = string_format("Include directive %s found at line %d NOT FOUND IN SYSTEM "
-                                        "NOR LIBRARIES PROVIDED (ignoring)\n",
+                                        "NOR LIBRARIES PROVIDED (ignoring)",
                                         line.c_str(), end_line + line_offset);
                 force_print = false;
 
@@ -217,6 +274,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                                 // flag does. Let's check now
                                 if (Parser::flags & FLAGS::AUTO_INCLUDE){
                                     // Create parser
+                                    std::cout << std::endl;
                                     VerilogBlock vlogtmp = Parser::__parse_file__(mod_defs_tmp,
                                                                                   module_references_tmp,
                                                                                   sources, lib,
@@ -244,12 +302,12 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
 
                                 } else {
                                     sources.push_back(line);
-                                    message = string_format("Include directive %s found at line %d added to global sources\n",
+                                    message = string_format("Include directive %s found at line %d added to global sources",
                                                             line.c_str(), end_line + line_offset);
                                 }
 
                             } else {
-                                message = string_format("Include directive %s found at line %d but IGNORED (as source file was already parsed)\n",
+                                message = string_format("Include directive %s found at line %d but IGNORED (as source file was already parsed)",
                                                         line.c_str(), end_line + line_offset);
                             }
                             force_print = true;
@@ -274,6 +332,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                                 if (file_exists(full_path)){
                                     if (Parser::flags & FLAGS::AUTO_INCLUDE) {
                                         // Create parser
+                                        std::cout << std::endl;
                                         VerilogBlock vlogtmp = Parser::__parse_file__(mod_defs_tmp, module_references_tmp,
                                                                                       sources, lib,
                                                                                       orphans_tmp,
@@ -297,7 +356,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                                     } else {
                                         sources.push_back(full_path);
                                         message = string_format("Include directive %s found at line %d found at "
-                                                                "library %s and added to global sources\n",
+                                                                "library %s and added to global sources",
                                                                 line.c_str(), end_line + line_offset, dir.c_str());
                                         force_print = true;
                                         break;
@@ -308,43 +367,36 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                     }
                 }
 
-                prev_line = "";
+                prev_block = "";
                 line = "";
+
+                // Group tracker (appender)
+                CURRENT_GROUP = _VLOG_GROUPS_::INVALID;
+
+
 
             } else {
                 start_line = end_line;
 
-                message = string_format("Directive found at line %d (ignored)\n", end_line + line_offset);
-                prev_line = "";
+                message = string_format("Directive found at line %d (ignored)", end_line + line_offset);
+                prev_block = "";
                 line = "";
+                // Group tracker (appender)
+                CURRENT_GROUP = _VLOG_GROUPS_::INVALID;
+
                 force_print = false;
             }
 
             // Check if this is a block comment
-        } else if (stringStartsWith(line, "/*")) {
-            int nbegins = string_count(line, __VLOG_BLOCK_COMMENT_OPEN_REGEX__);
-            int nends = string_count(line, __VLOG_BLOCK_COMMENT_END_REGEX__);
+        } else if (stringStartsWith(line, "/*") || (CURRENT_GROUP & _VLOG_GROUPS_::COMMENT)) {
 
-            if ((nbegins > nends) || (nbegins == 0 && nends == 0)) {
-                // Append line and keep looking for rest of statements
-                prev_line = line;
-                line = "";
-                message = string_format("Appending line %d to block comment declaration found at line %d",
-                                        end_line + line_offset, start_line + line_offset);
+            // Initialize Comment parser
+            BlockCommentParser block(stream, line, end_line);
 
-            } else if (nbegins == nends) {
-                // We closed the comment. Discard now
-                message = string_format("Block comment found from line %d to line %d (ignored)\n",
-                                        start_line + line_offset, end_line + line_offset);
-                prev_line = "";
-                line = "";
-                force_print = false;
-
-            } else {
-                // Something went wrong, throwing exception
-                throw std::invalid_argument(
-                        "Something went wrong while parsing block comment (we never found closing brackets). Raising error.");
-            }
+            // Parse (until "*\")
+            prev_block = block.parse(pbar, TAB);
+            start_line = block.end_line;
+            end_line = start_line;
 
         } else {
 
@@ -359,7 +411,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
             // initialize next_line tmp var
             std::string next_line = "";
 
-            if (LineChecker(line, __VLOG_PATTERNS_NON_NESTABLE_KEYWORDS__, __VLOG_NUM_PATTERNS_NON_NESTABLE_KEYWORDS__)) {
+            if (!(CURRENT_GROUP & _VLOG_GROUPS_::INSTANCE) & LineChecker(line, __VLOG_PATTERNS_NON_NESTABLE_KEYWORDS__, __VLOG_NUM_PATTERNS_NON_NESTABLE_KEYWORDS__)) {
 
                 // Count number (n) of non-nestable (nn) statements (blocks)
                 int nnnblocks = string_count(line, __VLOG_REGEX_NON_NESTABLE_KEYWORDS__);
@@ -395,13 +447,16 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
 
 
             // Now check for everything
-            if (stringStartsWith(line, "endmodule")) {
+            if (!(CURRENT_GROUP & _VLOG_GROUPS_::INSTANCE) & stringStartsWith(line, "endmodule")) {
                 // We found end of module definition, wrap things up and exit function
-                prev_line = next_line;
+                prev_block = next_line;
+                // Group tracker (appender)
+                CURRENT_GROUP = _VLOG_GROUPS_::INVALID;
                 break;
 
+
                 // Module|Macromodule Definition
-            } else if (LineChecker(line, __VLOG_MODULE_NAMES__, __VLOG_NUM_MODULE_NAMES__)) {
+            } else if (!(CURRENT_GROUP & _VLOG_GROUPS_::INSTANCE) & LineChecker(line, __VLOG_MODULE_NAMES__, __VLOG_NUM_MODULE_NAMES__) || CURRENT_GROUP & _VLOG_GROUPS_::MODULE) {
 
                 // Make sure there's a ; in the definition
                 std::size_t semicolon_pos = line.find(';');
@@ -441,10 +496,11 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
 
                     // What's left is simply the name of the module
                     std::string module_name = line;
+                    module_name = std::regex_replace(module_name, std::regex(R"(\\)"), R"(\\)");
                     trim(module_name);
 
                     // Print message before creating module
-                    message = string_format("Module %s found from line %d to %d\n", module_name.c_str(),
+                    message = string_format("Module %s found from line %d to %d", module_name.c_str(),
                                             start_line + line_offset, end_line + line_offset);
                     pbar.update(end_line, message, TAB);
 
@@ -504,66 +560,42 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                     end_line = start_line;
 
                     // Clean tmp vars
-                    prev_line = next_line;
+                    prev_block = next_line;
                     line = "";
 
                     // Setup message
                     message = "";
                     force_print = false;
 
+                    // Group tracker (appender)
+                    CURRENT_GROUP = _VLOG_GROUPS_::INVALID;
+
                 } else {
                     // Keep appending lines until we find a semicolon
-                    prev_line = line + next_line;
+                    prev_block = line + next_line;
                     line = "";
                     message = string_format("Appending data from line %d to Module declaration found at line %d",
                                             end_line + line_offset, start_line + line_offset);
 
+                    // Group tracker (appender)
+                    CURRENT_GROUP = _VLOG_GROUPS_::MODULE;
+
                 }
 
                 // Begin/End statement
-            } else if (LineChecker(line, __VLOG_PATTERNS_STATEMENTS__, __VLOG_NUM_PATTERNS_STATEMENTS__)) {
+            } else if (!(CURRENT_GROUP & _VLOG_GROUPS_::INSTANCE) & LineChecker(line, __VLOG_PATTERNS_STATEMENTS__, __VLOG_NUM_PATTERNS_STATEMENTS__) || CURRENT_GROUP & _VLOG_GROUPS_::BEGINEND) {
 
-                // The first thing we must do is calculate the number of opening and ending statements
-                // (that is, begin/ends). We have to keep appending lines until nbegins == nends.
-                // If for some reason we get at any point nends > nbegins, cancel this, as something went wrong.
-                int nbegins = string_count(line, __VLOG_BEGIN_REGEX__);
-                int nends = string_count(line, __VLOG_END_REGEX__);
+                // Initialize Begin/End parser
+                BlockBeginEnd block(stream, line, end_line);
 
-                // SystemVerilog in this sense is a bit annoying because it allows you to declare statements repeatedly
-                // without actually using "begin/end". This means we not only have to look for begin/end structures, but
-                // also for any new keyword that might define a new block. This includes instances, which is crazy,
-                // because right now we only assume a structure is an instance if we were not able to assign it to
-                // anything else.
-
-                if ((nbegins > nends)  || (nbegins == 0 && nends == 0)) {
-                    // Append line and keep looking for rest of statements
-                    prev_line = line + next_line;
-                    line = "";
-                    message = string_format(
-                            "Appending data from line %d to Begin/End Statement found previously at line %d",
-                            end_line + line_offset, start_line + line_offset);
-
-                } else if (nbegins == nends) {
-                    prev_line = next_line;
-                    line = "";
-
-                    // Setup message
-                    message = string_format("Begin/End statement found from line %d to %d (ignored)",
-                                            start_line + line_offset, end_line + line_offset);
-                    force_print = true;
-
-                    // Setup lines
-                    start_line = end_line;
-
-                } else {
-                    // Something went wrong, cause nends should NEVER be > nbegins, so let's just raise an exception here
-                    throw std::invalid_argument("Number of END keywords in block surpasses the number of BEGIN "
-                                                "found, which is impossible. Raising error.");
-                }
-
+                // Parse (until end (this block is autorecursive, meaning that any nested begin/end blocks will
+                // create new BlockBeginEnd objects))
+                prev_block = block.parse(pbar, TAB);
+                start_line = block.end_line;
+                end_line = start_line;
 
                 // Check if this is a netwire
-            } else if (LineChecker(line, __VLOG_PATTERNS_NETWIRES__, __VLOG_NUM_PATTERNS_NETWIRES__)) {
+            } else if (!(CURRENT_GROUP & _VLOG_GROUPS_::INSTANCE) & LineChecker(line, __VLOG_PATTERNS_NETWIRES__, __VLOG_NUM_PATTERNS_NETWIRES__)) {
 
                 /* Let's parse this bad boy now. The format for reg/wires/etc. in pseudo-regex is:
                 (input|output|inout)? (reg|wire|tri|integer|real|...)? ([<bit_size>])? <NAME> ([<array_size>])? (= <VALUE>)?
@@ -812,6 +844,8 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                     if (pos_bracket != std::string::npos) {
                         // Get arrayspan
                         arrayspan = line.substr(pos_bracket);
+                        std::replace(arrayspan.begin(), arrayspan.end(),'\n',' ');
+                        arrayspan = std::regex_replace(arrayspan, std::regex(R"(\\)"), R"(\\)");
 
                         // Now trim arrayspan from line
                         line = line.substr(0, pos_bracket);
@@ -839,6 +873,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                     while (next != end) {
                         // Get name
                         name = std::string(start, next);
+                        name = std::regex_replace(name, std::regex(R"(\\)"), R"(\\)");
 
                         // Make sure to trim name
                         trim(name);
@@ -878,6 +913,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                     // Last element
                     // Get name
                     name = std::string(start, next);
+                    name = std::regex_replace(name, std::regex(R"(\\)"), R"(\\)");
 
                     // Make sure to trim name
                     trim(name);
@@ -906,24 +942,24 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                     }
 
                     // Setup message
-                    message = string_format("%s(s) (%s) %s %s found at line %d\n", type.c_str(),
+                    message = string_format("%s(s) (%s) %s %s found at line %d", type.c_str(),
                                             names_msg.c_str(), bitspan.c_str(), arrayspan.c_str(), end_line + line_offset);
                     force_print = true;
 
                     // Assign post_line to line
                     line = post_line + next_line;
-                    prev_line = "";
+                    prev_block = "";
 
                 } else {
                     // We need to keep appending lines until we find a semicolon
-                    prev_line = line + next_line;
+                    prev_block = line + next_line;
                     line = "";
                     message = string_format("Appending data to netwires statement found at line %d",
                                             end_line + line_offset);
                 }
 
                 // Check if this is a parameter definition
-            } else if (LineChecker(line, __VLOG_PATTERNS_PARAMS__, __VLOG_NUM_PATTERNS_PARAMS__)) {
+            } else if (!(CURRENT_GROUP & _VLOG_GROUPS_::INSTANCE) & LineChecker(line, __VLOG_PATTERNS_PARAMS__, __VLOG_NUM_PATTERNS_PARAMS__)) {
 
                 // The first thing we must do is check if we can split this sentence into several statements
                 // separated by ;
@@ -977,6 +1013,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                     while (next != end) {
                         // Get name
                         name = std::string(start, next);
+                        name = std::regex_replace(name, std::regex(R"(\\)"), R"(\\)");
 
                         // Make sure to trim name
                         trim(name);
@@ -1003,6 +1040,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                     // Find last one
                     // Get name
                     name = std::string(start, next);
+                    name = std::regex_replace(name, std::regex(R"(\\)"), R"(\\)");
 
                     // Make sure to trim name
                     trim(name);
@@ -1020,24 +1058,24 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                     parameters.push_back(par);
 
                     // Setup message
-                    message = string_format("Parameter(s) (%s) found at line %d\n",
+                    message = string_format("Parameter(s) (%s) found at line %d",
                                             names_msg.c_str(), end_line + line_offset);
                     force_print = true;
 
                     // Assign post_line to line
                     line = post_line + next_line;
-                    prev_line = "";
+                    prev_block = "";
 
                 } else {
                     // We need to keep appending lines until we find a semicolon
-                    prev_line = line + next_line;
+                    prev_block = line + next_line;
                     line = "";
                     message = string_format("Appending data to parameter statement found at line %d",
                                             end_line + line_offset);
                 }
 
                 // Check if this is an assign statement (which we will ignore)
-            } else if (LineChecker(line, __VLOG_SEMICOLON_STATEMENTS__, __VLOG_NUM_SEMICOLON_STATEMENTS__)) {
+            } else if (!(CURRENT_GROUP & _VLOG_GROUPS_::INSTANCE) & LineChecker(line, __VLOG_SEMICOLON_STATEMENTS__, __VLOG_NUM_SEMICOLON_STATEMENTS__)) {
 
                 // The first thing we must do is check if we can split this sentence into several statements
                 // separated by ;
@@ -1045,7 +1083,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                 std::string post_line;
                 if (semicolon_pos != std::string::npos) {
                     // Separate post_line first
-                    prev_line = line.substr(semicolon_pos + 1) + next_line;
+                    prev_block = line.substr(semicolon_pos + 1) + next_line;
                     line = "";
 
                     // Setup message
@@ -1054,14 +1092,14 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
 
                 } else {
                     // We need to keep appending lines until we find a semicolon
-                    prev_line = line + next_line;
+                    prev_block = line + next_line;
                     line = "";
                     message = string_format("Appending data to Statement found at line %d", end_line + line_offset);
                 }
 
 
                 // Check if this is a typedef
-            } else if (stringStartsWith(line, "struct")) {
+            } else if (!(CURRENT_GROUP & _VLOG_GROUPS_::INSTANCE) & stringStartsWith(line, "struct")) {
 
                 // The first thing we must do is check if we can split this sentence into several statements
                 // separated by ;
@@ -1069,18 +1107,19 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                 std::string post_line;
                 if (semicolon_pos != std::string::npos) {
                     // Separate post_line first
-                    prev_line = line.substr(semicolon_pos + 1);
+                    prev_block = line.substr(semicolon_pos + 1);
 
                     std::smatch match;
 
                     if (std::regex_search(line, match, __VLOG_STRUCT_PATTERN__))
                     {
                         std::string name = match[4];
+                        name = std::regex_replace(name, std::regex(R"(\\)"), R"(\\)");
                     }
 
                     post_line = line.substr(semicolon_pos + 1);
                     std::size_t semicolon_pos = post_line.find(';');
-                    prev_line = post_line.substr(semicolon_pos + 1) + next_line;
+                    prev_block = post_line.substr(semicolon_pos + 1) + next_line;
 
                     // Setup message
                     message = string_format("Struct def found at line %d", end_line + line_offset);
@@ -1088,14 +1127,14 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
 
                 } else {
                     // We need to keep appending lines until we find a } character
-                    prev_line = line + next_line;
+                    prev_block = line + next_line;
                     line = "";
                     message = string_format("Appending data to struct def found at line %d", end_line + line_offset);
                 }
 
 
                 // Check if this is a function definition
-            } else if (LineChecker(line, __VLOG_GROUPS__, __VLOG_NUM_GROUPS__)) {
+            } else if (!(CURRENT_GROUP & _VLOG_GROUPS_::INSTANCE) & LineChecker(line, __VLOG_GROUPS__, __VLOG_NUM_GROUPS__)) {
 
                 // The first thing we must do is calculate the number of opening and ending statements
                 // (that is, begin/ends). We have to keep appending lines until nbegins == nends.
@@ -1183,7 +1222,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                 // Check if there's any open nested statement
                 if (statements_open) {
                     // This means that at least one statement is still open, so let's keep appending lines
-                    prev_line = line + next_line;
+                    prev_block = line + next_line;
                     line = "";
                     message = string_format(
                             "Appending data from line %d to Statement found previously at line %d",
@@ -1195,7 +1234,7 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                                                 "found, which is impossible. Raising error.");
                 } else {
                     // Then all statements have been properly closed, so let's wrap this up
-                    prev_line = next_line;
+                    prev_block = next_line;
                     line = "";
 
                     // Setup message
@@ -1208,75 +1247,123 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
                 }
 
                 // Check if this module instance (either primitive or not, it doesn't matter)
-            } else if (std::regex_search(line, match_pattern, __VLOG_INSTANCE_PATTERN__)) {
+            } else if (line.find(";") != std::string::npos){
 
-                std::string module_ref_name = match_pattern[1];
-                std::string instance_parameters = match_pattern[2];
-                std::string instance_name = match_pattern[3];
-                std::string instance_ports = match_pattern[4];
+                // Build whole instance def
+                line = prev_block + line;
 
-                // Module name cleaning
-                // Trim the shit outta everything
-                trim(module_ref_name);
+                if (std::regex_search(line, match_pattern, __VLOG_INSTANCE_PATTERN__)) {
 
-                // Instance parameters (if any)
-                trim(instance_parameters);
-                // Now see if we have any parameters in the instantiation
-                std::vector <Parameter> inst_params;
-                std::size_t hash_pos = instance_parameters.find("#");
-                if (hash_pos != std::string::npos) {
-                    // Discard "#" and look for opening parentheses
-                    instance_parameters = instance_parameters.substr(hash_pos + 1);
-                    ltrim(instance_parameters);
+                    std::string module_ref_name = match_pattern[1];
+                    std::string instance_parameters = match_pattern[2];
+                    std::string instance_name = match_pattern[3];
+                    std::string instance_ports = match_pattern[4];
 
-                    // Get parameters inside parentheses
-                    std::size_t par_pos = instance_parameters.find("(");
-                    if (par_pos != std::string::npos) {
-                        // Discard opening parentheses
-                        instance_parameters = instance_parameters.substr(par_pos + 1);
+                    module_ref_name = std::regex_replace(module_ref_name, std::regex(R"(\\)"), R"(\\)");
+                    instance_name = std::regex_replace(instance_name, std::regex(R"(\\)"), R"(\\)");
+
+                    // Module name cleaning
+                    // Trim the shit outta everything
+                    trim(module_ref_name);
+
+                    // Instance parameters (if any)
+                    trim(instance_parameters);
+                    // Now see if we have any parameters in the instantiation
+                    std::vector<Parameter> inst_params;
+                    std::size_t hash_pos = instance_parameters.find("#");
+                    if (hash_pos != std::string::npos) {
+                        // Discard "#" and look for opening parentheses
+                        instance_parameters = instance_parameters.substr(hash_pos + 1);
                         ltrim(instance_parameters);
 
-                        // Look for closing parentheses
-                        par_pos = instance_parameters.find(")");
-
+                        // Get parameters inside parentheses
+                        std::size_t par_pos = instance_parameters.find("(");
                         if (par_pos != std::string::npos) {
-                            std::string inst_params_str = instance_parameters.substr(0, par_pos - 1);
+                            // Discard opening parentheses
                             instance_parameters = instance_parameters.substr(par_pos + 1);
-                            // Trim
                             ltrim(instance_parameters);
-                            trim(inst_params_str);
 
-                            // At this point we can process the parameters
+                            // Look for closing parentheses
+                            par_pos = instance_parameters.find(")");
 
-                            // Parse parameters, which are separated by commas (and spaces along with the commas)
-                            // Initialize array of NetWires
-                            std::string inst_params_msg = "";
-                            bool first_time = true;
-                            // Store beginning and end of sentences
-                            std::string::const_iterator start = inst_params_str.begin();
-                            std::string::const_iterator end = inst_params_str.end();
-                            std::string::const_iterator next = std::find(start, end, ',');
-                            std::string param_def, param_name, param_value = "";
+                            if (par_pos != std::string::npos) {
+                                std::string inst_params_str = instance_parameters.substr(0, par_pos - 1);
+                                instance_parameters = instance_parameters.substr(par_pos + 1);
+                                // Trim
+                                ltrim(instance_parameters);
+                                trim(inst_params_str);
 
-                            // Loop thru all splits until we find end of line
-                            while (next != end) {
+                                // At this point we can process the parameters
+
+                                // Parse parameters, which are separated by commas (and spaces along with the commas)
+                                // Initialize array of NetWires
+                                std::string inst_params_msg = "";
+                                bool first_time = true;
+                                // Store beginning and end of sentences
+                                std::string::const_iterator start = inst_params_str.begin();
+                                std::string::const_iterator end = inst_params_str.end();
+                                std::string::const_iterator next = std::find(start, end, ',');
+                                std::string param_def, param_name, param_value = "";
+
+                                // Loop thru all splits until we find end of line
+                                while (next != end) {
+                                    // Get name and value
+                                    param_def = std::string(start, next);
+                                    // Make sure to trim def
+                                    trim(param_def);
+                                    // Split between name and value
+                                    std::size_t pos_eq = param_def.find("=");
+                                    if (pos_eq != std::string::npos) {
+                                        // Get name
+                                        param_name = param_def.substr(0, pos_eq - 1);
+                                        rtrim(param_name);
+
+                                        // Get value
+                                        param_value = param_def.substr(pos_eq + 1);
+                                        ltrim(param_value);
+
+                                        // Initialize parameter
+                                        Parameter ptmp{param_name, param_value};
+
+                                        // Put in place
+                                        inst_params.push_back(ptmp);
+
+
+                                        // Add to names_msg so we display this in our message later
+                                        if (first_time)
+                                            inst_params_msg = param_name + " = " + param_value;
+                                        else
+                                            inst_params_msg += ", " + param_name + " = " + param_value;
+
+                                        first_time = false;
+
+                                    }
+
+                                    // Increase start
+                                    start = next + 1;
+
+                                    // Find next
+                                    next = std::find(start, end, ',');
+                                }
+
+                                // Remember to repeat process for last instance
                                 // Get name and value
                                 param_def = std::string(start, next);
                                 // Make sure to trim def
                                 trim(param_def);
                                 // Split between name and value
                                 std::size_t pos_eq = param_def.find("=");
-                                if (pos_eq != std::string::npos){
+                                if (pos_eq != std::string::npos) {
                                     // Get name
-                                    param_name = param_def.substr(0,pos_eq-1);
+                                    param_name = param_def.substr(0, pos_eq - 1);
                                     rtrim(param_name);
 
                                     // Get value
-                                    param_value = param_def.substr(pos_eq+1);
+                                    param_value = param_def.substr(pos_eq + 1);
                                     ltrim(param_value);
 
                                     // Initialize parameter
-                                    Parameter ptmp {param_name, param_value};
+                                    Parameter ptmp{param_name, param_value};
 
                                     // Put in place
                                     inst_params.push_back(ptmp);
@@ -1297,161 +1384,134 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
 
                                 // Find next
                                 next = std::find(start, end, ',');
-                            }
-
-                            // Remember to repeat process for last instance
-                            // Get name and value
-                            param_def = std::string(start, next);
-                            // Make sure to trim def
-                            trim(param_def);
-                            // Split between name and value
-                            std::size_t pos_eq = param_def.find("=");
-                            if (pos_eq != std::string::npos){
-                                // Get name
-                                param_name = param_def.substr(0,pos_eq-1);
-                                rtrim(param_name);
-
-                                // Get value
-                                param_value = param_def.substr(pos_eq+1);
-                                ltrim(param_value);
-
-                                // Initialize parameter
-                                Parameter ptmp {param_name, param_value};
-
-                                // Put in place
-                                inst_params.push_back(ptmp);
-
-
-                                // Add to names_msg so we display this in our message later
-                                if (first_time)
-                                    inst_params_msg = param_name + " = " + param_value;
-                                else
-                                    inst_params_msg += ", " + param_name + " = " + param_value;
-
-                                first_time = false;
 
                             }
 
-                            // Increase start
-                            start = next + 1;
+                        }
+                    }
 
-                            // Find next
-                            next = std::find(start, end, ',');
+                    // Instance name
+                    trim(instance_name);
 
+                    // Instance ports (if any)
+                    trim(instance_ports);
+
+                    // Get the ports first
+                    std::size_t par_pos = instance_ports.find("(");
+                    std::string inst_ports = "";
+                    if (par_pos != std::string::npos) {
+                        inst_ports = instance_ports.substr(par_pos + 1);
+                        instance_ports = instance_ports.substr(0, par_pos);
+                        rtrim(instance_ports);
+                        ltrim(inst_ports);
+
+                        par_pos = instance_ports.find(")");
+                        if (par_pos != std::string::npos) {
+                            inst_ports = instance_ports.substr(par_pos - 1);
+                            rtrim(inst_ports);
+                        } else {
+                            inst_ports = "";
+                        }
+                    }
+
+                    // Create instance
+                    VerilogBlock instance_tmp;
+
+                    // check if module exists
+                    if (module_references.contains(module_ref_name)) {
+                        instance_tmp = module_references.at(module_ref_name);
+                        instance_tmp.parameters = inst_params;
+                        instance_tmp.ancestors = ancestors_tmp;
+                        instance_tmp.ref = module_ref_name;
+                        instance_tmp.name = instance_name;
+                        instance_tmp.sourcefile_ = SRC;
+                        // Push into vector
+                        vblock.push(module_ref_name, instance_tmp);
+
+                        // Add to subhierarchy
+                        //subhierarchy_tmp += instance_tmp.subhierarchy;
+                    } else {
+                        std::string subhierarchy_tmp = string_format("%s\"ref\": \"%s\"\n",
+                                                                     TAB.c_str(), module_ref_name.c_str());
+                        instance_tmp.ref = module_ref_name;
+                        instance_tmp.name = instance_name;
+                        instance_tmp.parameters = inst_params;
+                        instance_tmp.ancestors = ancestors_tmp;
+                        instance_tmp.subhierarchy = subhierarchy_tmp;
+                        instance_tmp.sourcefile_ = SRC;
+
+                        // Push into vector
+                        vblock.push(module_ref_name, instance_tmp);
+
+                        if (!orphans_tmp.contains(module_ref_name)) {
+                            orphans_tmp.insert(
+                                    std::pair<std::string, std::vector<std::string>>(module_ref_name, {instance_name}));
+                        } else {
+                            orphans_tmp.at(module_ref_name).push_back({instance_name});
                         }
 
                     }
-                }
 
-                // Instance name
-                trim(instance_name);
 
-                // Instance ports (if any)
-                trim(instance_ports);
+                    // Push into children vector
+                    if (std::find(children_tmp.begin(), children_tmp.end(), module_ref_name) ==
+                        children_tmp.end())
+                        children_tmp.push_back(module_ref_name);
 
-                // Get the ports first
-                std::size_t par_pos = instance_ports.find("(");
-                std::string inst_ports = "";
-                if (par_pos != std::string::npos) {
-                    inst_ports = instance_ports.substr(par_pos+1);
-                    instance_ports = instance_ports.substr(0,par_pos);
-                    rtrim(instance_ports);
-                    ltrim(inst_ports);
+                    // See if we can find this instance in the module definition vector
+                    /*
+                    std::__wrap_iter<VerilogBlock *> index_ref = find_module_def(module_definitions.begin(), module_definitions.end(), module_ref_name);
+                    if (index_ref != module_definitions.end())
+                    {
+                        // Element in vector.
+                        index_ref;
 
-                    par_pos = instance_ports.find(")");
-                    if (par_pos != std::string::npos) {
-                        inst_ports = instance_ports.substr(par_pos - 1);
-                        rtrim(inst_ports);
-                    } else {
-                        inst_ports = "";
                     }
-                }
+                     */
 
-                // Create instance
-                VerilogBlock instance_tmp;
 
-                // check if module exists
-                if (module_references.contains(module_ref_name)){
-                    instance_tmp = module_references.at(module_ref_name);
-                    instance_tmp.parameters = inst_params;
-                    instance_tmp.ancestors = ancestors_tmp;
-                    instance_tmp.ref = module_ref_name;
-                    instance_tmp.name = instance_name;
-                    instance_tmp.sourcefile_ = SRC;
-                    // Push into vector
-                    vblock.push(module_ref_name, instance_tmp);
+                    // Print message before creating module
+                    message = string_format("Instance '%s' of module '%s' found from line %d to %d",
+                                            instance_name.c_str(),
+                                            module_ref_name.c_str(),
+                                            start_line + line_offset,
+                                            end_line + line_offset);
+                    force_print = false;
 
-                    // Add to subhierarchy
-                    //subhierarchy_tmp += instance_tmp.subhierarchy;
+                    prev_block = next_line;
+                    line = "";
+                    CURRENT_GROUP = _VLOG_GROUPS_::INVALID;
                 } else {
-                    std::string subhierarchy_tmp = string_format("%s\"ref\": \"%s\"\n",
-                                                                 TAB.c_str(),module_ref_name.c_str());
-                    instance_tmp.ref = module_ref_name;
-                    instance_tmp.name = instance_name;
-                    instance_tmp.parameters = inst_params;
-                    instance_tmp.ancestors = ancestors_tmp;
-                    instance_tmp.subhierarchy = subhierarchy_tmp;
-                    instance_tmp.sourcefile_ = SRC;
-
-                    // Push into vector
-                    vblock.push(module_ref_name, instance_tmp);
-
-                    if (!orphans_tmp.contains(module_ref_name)){
-                        orphans_tmp.insert(std::pair<std::string,std::vector<std::string>>(module_ref_name,{instance_name}));
-                    } else {
-                        orphans_tmp.at(module_ref_name).push_back({instance_name});
-                    }
-
+                    // Discard this whole definition
+                    prev_block = next_line;
+                    line = "";
+                    CURRENT_GROUP = _VLOG_GROUPS_::INVALID;
                 }
-
-
-                // Push into children vector
-                if (std::find(children_tmp.begin(), children_tmp.end(), module_ref_name) == children_tmp.end()) children_tmp.push_back(module_ref_name);
-
-                // See if we can find this instance in the module definition vector
-                /*
-                std::__wrap_iter<VerilogBlock *> index_ref = find_module_def(module_definitions.begin(), module_definitions.end(), module_ref_name);
-                if (index_ref != module_definitions.end())
-                {
-                    // Element in vector.
-                    index_ref;
-
-                }
-                 */
-
-
-                // Print message before creating module
-                message = string_format("Instance '%s' of module '%s' found from line %d to %d\n",
-                                        instance_name.c_str(),
-                                        module_ref_name.c_str(),
-                                        start_line + line_offset,
-                                        end_line + line_offset);
-                force_print = false;
-
-                prev_line = next_line;
-                line = "";
 
             } else {
 
                 // We don't know what this is, but it's not parseable
                 //message = string_format("Undefined content at line %d ignored\n", end_line + line_offset);
-                //prev_line = "";
+                //prev_block = "";
                 //line = "";
 
                 // We need to keep appending lines until we find a semicolon
-                prev_line = line + next_line;
+                prev_block = prev_block + line + next_line;
+                message = string_format("Appending data to Instance definition (size: %d) found at line %d",
+                                        line.size(), end_line + line_offset);
                 line = "";
-                message = string_format("Appending data to Instance definition found at line %d",
-                                        end_line + line_offset);
+                force_print = true;
+                CURRENT_GROUP = _VLOG_GROUPS_::INSTANCE;
             }
 
         }
 
 
         // Update progress bar
-        if (((end_line % delta == 0) || force_print) && (message != ""))
+        if (((end_line % delta == 0) || force_print) && (message != "")) {
             pbar.update(end_line, message, TAB);
-
+            message = "";
+        }
     }
 
     // Get final time
@@ -1509,8 +1569,8 @@ VerilogBlock Parser::__parse__(std::vector <VerilogBlock>& module_definitions,
     seconds = (seconds%60);
 
     std::basic_string message_out = "";
-    message_out = string_format("\n\t%s#--- Completed in %02d:%02d:%02d (hh:mm:ss) --- #",TAB.c_str(),hours,minutes,seconds);
-    std::cout << std::endl << message_out << std::endl;
+    message_out = string_format("%s#--- Completed in %02d:%02d:%02d (hh:mm:ss) --- #",TAB.substr(0,TAB.length()-3).c_str(),hours,minutes,seconds);
+    std::cout << std::endl << message_out;
 
     // Return block
     return vblock;
@@ -1526,7 +1586,6 @@ int Parser::__count_number_lines__(const char *FILENAME) {
 
     return nlines;
 }
-
 
 
 // Create a general array matcher. This will return one if ANY of the
@@ -1551,4 +1610,98 @@ bool LineChecker(std::string mainStr, std::vector<std::string> patterns, int n_p
 }
 
 
+// BlockComment parser
+std::string BlockCommentParser::parse(progressBar& pbar, std::string TAB){
 
+    std::string line = "";
+    std::string message = "";
+    end_line = start_line;
+
+    // Our duty is to keep reading lines until we find the character "*\"
+    while (!stream.eof()) //!stream.eof()
+    {
+        // If the previous block is empty we for sure need to process the new line
+        getline(stream, line);
+
+        // Increase iline
+        end_line++;
+
+        // Left-trim the line
+        ltrim(line);
+
+        // If empty string, go to next line
+        if (line == "") continue;
+
+        int nends = string_count(line, __VLOG_BLOCK_COMMENT_END_REGEX__);
+
+        if (!content.empty()) content = content + '\n' + line; else content = line;
+
+        if (nends > 0) {
+            // We closed the comment. Discard now
+            message = string_format("Block comment found from line %d to line %d (ignored)",
+                                    start_line, end_line);
+
+            // Update progress bar
+            pbar.update(end_line, message, TAB);
+
+            return "";
+        }
+    }
+}
+
+
+
+
+// Block BeginEnd parser
+std::string BlockBeginEnd::parse(progressBar& pbar, std::string TAB){
+
+    std::string line = "";
+    std::string message = "";
+    end_line = start_line;
+    std::string prev_block = "";
+
+    // If we find another BEGIN create a new parser object, if not, end and return
+    while (!stream.eof()) //!stream.eof()
+    {
+        // If the previous block is empty we for sure need to process the new line
+        getline(stream, line);
+
+        // Increase iline
+        end_line++;
+
+        // Left-trim the line
+        ltrim(line);
+
+        // If empty string, go to next line
+        if (line == "") continue;
+
+        int nbegins = string_count(line, __VLOG_BEGIN_REGEX__);
+        int nends = string_count(line, __VLOG_END_REGEX__);
+
+        // If nbegins > nends (usually nbegins == 1 and nends == 0), start new block
+        if (nbegins > nends){
+            BlockBeginEnd block(stream,"",end_line);
+            prev_block = block.parse(pbar, TAB + "\t");
+            end_line = block.end_line;
+
+        } else if (nbegins < nends) {
+            // We found the fnal end, let's close this and return
+            message = string_format("Begin/End statement found from line %d to %d (ignored)",
+                                    start_line, end_line);
+
+            // Update progress bar
+            pbar.update(end_line, message, TAB);
+
+            return prev_block;
+        } else if (LineChecker(line, __VLOG_PATTERNS_NON_NESTABLE_KEYWORDS__, __VLOG_NUM_PATTERNS_NON_NESTABLE_KEYWORDS__)) {
+            // We found the fnal end, let's close this and return
+            message = string_format("Begin/End statement found from line %d to %d (ignored)",
+                                    start_line, end_line);
+
+            // Update progress bar
+            pbar.update(end_line, message, TAB);
+
+            return line;
+        }
+    }
+}

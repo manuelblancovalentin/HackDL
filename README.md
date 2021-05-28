@@ -12,8 +12,6 @@
 </tr>
 </table>
 
-
-
 ## What is this for?
 HackTMR is a tool for automatic HLS manipulation. It allows the user 
 to perform multiple tasks with the purpose of modifying, 

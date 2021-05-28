@@ -9,7 +9,7 @@
 #include <algorithm>
 #include <filesystem>
 
-void triplicate_modules(int TMR,
+void triplicate_modules(std::vector<std::string>& TMR,
                         std::vector<std::vector<std::string>>& subsets,
                         std::map<std::string,VerilogBlock>& module_references,
                         std::map<std::string, std::string> __serial_instances__,
@@ -23,8 +23,25 @@ void triplicate_modules(int TMR,
     std::map<std::string,std::vector<std::string>> mod_files;
     std::map<std::string,std::string> replacements;
 
+    // Get the flags for TMR
+    bool fullTMR = false;
+    bool inTMR = false;
+    bool clkTMR = false;
+    bool logicTMR = false;
+    bool outTMR = false;
+    for (const auto& s: TMR){
+        fullTMR |= (s == "full");
+        inTMR |= (s == "in") | fullTMR;
+        clkTMR |= (s == "clk") | fullTMR;
+        logicTMR |= (s == "logic") | fullTMR | clkTMR;
+        outTMR |= (s == "out") | fullTMR;
+    }
+
+    // vars
+    std::string FILEPATH_OUT;
+
     // Parse type of TMR
-    if (TMR == 3){
+    if (inTMR | clkTMR | logicTMR | outTMR){
         // Check the modules we are supposed to modify
         std::cout << "Patterns to triplicate:\n";
         for (auto& s: subsets){
@@ -84,17 +101,21 @@ void triplicate_modules(int TMR,
             std::string ref = el.first;
             std::string rep = el.second;
             std::vector<std::string> sfx = {"A","B","C"};
+            int nsfxs = sfx.size();
 
             // Get the ports for this reference
             if (module_references.contains(ref)){
                 Ports ports = module_references[ref].ports;
                 std::vector<NetWire> netwires = module_references[ref].netwires;
 
+                // Substitutions we have to make to our submodule
+                std::map<std::string,std::map<std::string,std::string>> subports;
+
                 // Start building the string
-                std::string DEF = string_format("module %s (\n", rep.c_str());
+                std::string DEF = string_format("module %s (\n\n", rep.c_str());
                 std::string FANS = "";
                 std::string VOTERS = "";
-                std::string gen_INST = "";
+                std::string ori_INST = "";
                 std::string TRIP_SIGNALS = "";
 
                 // Loop through inputs
@@ -123,28 +144,109 @@ void triplicate_modules(int TMR,
                     if (!type.empty()) IP += string_format("%s", type.c_str());
                     if (!bitspan.empty()) IP += string_format(" %s", bitspan.c_str());
                     if (!arrayspan.empty()) IP += string_format("%s", arrayspan.c_str());
-                    IP += string_format(" %s", name.c_str());
-                    if (!value.empty()) IP += string_format(" = %s", value.c_str());
-                    DEF += "\tinput " + IP + ";\n";
 
-                    // Triplicated inputs registers
-                    for (auto& sf: sfx){
-                        TRIP_SIGNALS += "\t" + IP + sf + ";\n";
+                    std::string IP2 = IP + string_format(" %s", name.c_str());
+                    if (!value.empty()) IP2 += string_format(" = %s", value.c_str());
+
+                    // Only define if this is not a clk signal
+                    if (!name.starts_with("clk") | !clkTMR){
+
+                        // inTMR == 0 means module only gets 1 input signal
+                        // inTMR == 1 means module gets 3 input signals
+                        if (!inTMR){
+                            // Don't triplicate input (but still name it with the first suffix, for consistency)
+                            DEF += string_format("\tinput %s%s;\n",name.c_str(),sfx[0].c_str());
+
+                            // We have to triplicate each input signal using a fanout (in case logic is triplicated)
+                            if (logicTMR){
+                                // Fanout
+                                FANS += string_format("\tfanout #(.WIDTH(1)) %s_fanout(\n", name.c_str());
+                                FANS += string_format("\t\t.in(%s%s),\n", name.c_str(), sfx[0].c_str());
+                                for (int j = 0; j < nsfxs; j++) {
+                                    FANS += "\t\t.out" + sfx[j] + "(net_" + name + sfx[j] + ")";
+                                    if (j < (nsfxs-1)) FANS += ",";
+                                    FANS += "\n";
+                                }
+                                FANS += "\t);\n\n";
+
+                                // And triplicated internal signals for fanout
+                                for (auto &sf: sfx) {
+                                    std::string IP3 = IP + string_format(" net_%s", name.c_str());
+                                    if (!value.empty()) IP3 += string_format(" = %s", value.c_str());
+
+                                    TRIP_SIGNALS += "\t" + IP3 + sf + ";\n";
+
+                                    if (!subports.contains(sf)) subports[sf] = {};
+                                    subports[sf][name] = "net_" + name + sf;
+                                }
+
+
+                            } else {
+                                std::string sf = sfx[0];
+                                if (!subports.contains(sf)) subports[sf] = {};
+                                subports[sf][name] = name + sf;
+                            }
+
+
+                        } else {
+
+                            // Triplicated inputs registers
+                            for (auto &sf: sfx) {
+                                DEF += "\tinput";
+                                if (!bitspan.empty()) DEF += string_format(" %s", bitspan.c_str());
+                                if (!arrayspan.empty()) DEF += string_format("%s", arrayspan.c_str());
+                                DEF += " " + name + sf + ";\n";
+                            }
+
+                            // If logic is not going to be triplicated, but we triplicated this input, we need a voter
+                            if (!logicTMR){
+                                // We have to create a majorityVoter for this input
+                                VOTERS += string_format("\tmajorityVoter #(.WIDTH(1)) %s_Voter(\n", name.c_str());
+                                for (int k = 0; k < nsfxs; k++) {
+                                    VOTERS += string_format("\t\t.in%s(%s%s)", sfx[k].c_str(), name.c_str(), sfx[k].c_str());
+                                    if (k < (nsfxs-1)) VOTERS += ",";
+                                    VOTERS += "\n";
+                                }
+                                // Use first suffix for consistency
+                                VOTERS += string_format("\t\t.out(net_%s%s)\n", name.c_str(), sfx[0].c_str());
+                                VOTERS += "\t);\n\n";
+
+                                // And triplicated internal signals for voter (for consistency)
+                                TRIP_SIGNALS += "\t net_" + name + sfx[0] + ";\n";
+
+                                std::string sf = sfx[0];
+                                if (!subports.contains(sf)) subports[sf] = {};
+                                subports[sf][name] = "net_" + name + sf;
+
+                            } else {
+
+                                for (auto &sf: sfx){
+                                    if (!subports.contains(sf)) subports[sf] = {};
+                                    subports[sf][name] = name + sf;
+                                }
+
+                            }
+
+                        }
+
+                    } else {
+
+                        // Clock Triplication (if we are here it's because logicTMR is true. We forced this to be true)
+                        for (auto &sf: sfx){
+
+                            DEF += "\tinput";
+                            if (!bitspan.empty()) DEF += string_format(" %s", bitspan.c_str());
+                            if (!arrayspan.empty()) DEF += string_format("%s", arrayspan.c_str());
+                            DEF += " " + name + sf + ";\n";
+
+                            if (!subports.contains(sf)) subports[sf] = {};
+                            subports[sf][name] = name + sf;
+                        }
+
                     }
 
-                    // We have to triplicate each input signal using a fanout
-                    FANS += string_format("\tfanout #(.WIDTH(1)) %s_fanout(\n",name.c_str());
-                    FANS += string_format("\t\t.in(%s),\n",name.c_str());
-                    FANS += string_format("\t\t.outA(%sA),\n",name.c_str());
-                    FANS += string_format("\t\t.outB(%sB),\n",name.c_str());
-                    FANS += string_format("\t\t.outC(%sC)\n",name.c_str());
-                    FANS += "\t);\n\n";
-
-                    // Append to gen_INST
-                    gen_INST += string_format("\t\t.%s\t(%s$)", name.c_str(), name.c_str());
-                    if ((i < (ninputs - 1)) | (noutputs > 0)) gen_INST += ",";
-                    gen_INST += "\n";
                 }
+
 
                 // Outputs
                 DEF += "\n\t// Output signals\n";
@@ -168,32 +270,100 @@ void triplicate_modules(int TMR,
                     if (!type.empty()) OP += string_format("%s", type.c_str());
                     if (!bitspan.empty()) OP += string_format(" %s", bitspan.c_str());
                     if (!arrayspan.empty()) OP += string_format("%s", arrayspan.c_str());
-                    OP += string_format(" %s", name.c_str());
-                    if (!value.empty()) OP += string_format(" = %s", value.c_str());
-                    DEF += "\toutput " + OP + ";\n";
 
-                    // Triplicated output registers
-                    for (auto& sf: sfx){
-                        TRIP_SIGNALS += "\t" + OP + sf + ";\n";
+                    std::string OP2 = OP + string_format(" %s", name.c_str());
+                    if (!value.empty()) OP2 += string_format(" = %s", value.c_str());
+
+                    // outTMR == 0 means module spits only 1 output signal
+                    // outTMR == 1 means module spits 3 output signals
+                    if (!outTMR){
+
+                        // Only one output for this module (suffix 0 for consistency)
+                        DEF += "\toutput " + OP2 + sfx[0] + ";\n";
+
+                        // If we triplicated the logic, we will need a majority voter
+                        if (logicTMR){
+                            VOTERS += string_format("\tmajorityVoter #(.WIDTH(1)) %s_Voter(\n", name.c_str());
+                            for (int k = 0; k < nsfxs; k++) {
+                                VOTERS += string_format("\t\t.in%s(%s%s)", sfx[k].c_str(), name.c_str(), sfx[k].c_str());
+                                if (k < (nsfxs-1)) VOTERS += ",";
+                                VOTERS += "\n";
+                            }
+                            VOTERS += string_format("\t\t.out(net_%s%s)\n", name.c_str(), sfx[0].c_str());
+                            VOTERS += "\t);\n\n";
+
+                            // And triplicated internal signals for voter (for consistency)
+                            TRIP_SIGNALS += "\t" + OP + string_format(" net_%s%s", name.c_str(), sfx[0].c_str());
+                            if (!value.empty()) TRIP_SIGNALS += string_format(" = %s", value.c_str());
+                            TRIP_SIGNALS += ";\n";
+
+                        }
+
+                        std::string sf = sfx[0];
+                        if (!subports.contains(sf)) subports[sf] = {};
+                        subports[sf][name] = name + sf;
+
+                    } else {
+
+                        // Triplicate outputs
+                        for (auto &sf: sfx) {
+                            DEF += "\toutput " + OP + string_format(" %s%s", name.c_str(), sf.c_str());
+                            if (!value.empty()) DEF += string_format(" = %s", value.c_str());
+                            DEF += ";\n";
+                        }
+
+                        // Triplicate internal signals (if we triplicated the logic)
+                        if (logicTMR){
+                            // We need voter for each logic + inner signals
+                            for (auto &sf: sfx){
+                                VOTERS += string_format("\tmajorityVoter #(.WIDTH(1)) %s%s_Voter(\n", name.c_str(), sf.c_str());
+                                for (int k = 0; k < nsfxs; k++) {
+                                    VOTERS += string_format("\t\t.in%s(%s%s)", sfx[k].c_str(), name.c_str(), sfx[k].c_str());
+                                    if (k < (nsfxs-1)) VOTERS += ",";
+                                    VOTERS += "\n";
+                                }
+                                // Use first suffix for consistency
+                                VOTERS += string_format("\t\t.out(net_%s%s)\n", name.c_str(), sf.c_str());
+                                VOTERS += "\t);\n\n";
+                            }
+
+                            // Create inner signals now and replacemnts
+                            for (auto &sf: sfx) {
+                                TRIP_SIGNALS += "\t" + OP + string_format(" net_%s%s", name.c_str(), sf.c_str());
+                                if (!value.empty()) TRIP_SIGNALS += string_format(" = %s", value.c_str());
+                                TRIP_SIGNALS += ";\n";
+
+                                if (!subports.contains(sf)) subports[sf] = {};
+                                subports[sf][name] = "net_" + name + sf;
+                            }
+
+                        } else {
+                            // We need a fanout
+                            FANS += string_format("\tfanout #(.WIDTH(1)) %s_fanout(\n", name.c_str());
+                            FANS += string_format("\t\t.in(net_%s%s),\n", name.c_str(), sfx[0].c_str());
+                            for (int j = 0; j < nsfxs; j++) {
+                                FANS += "\t\t.out" + sfx[j] + "(" + name + sfx[j] + ")";
+                                if (j < (nsfxs-1)) FANS += ",";
+                                FANS += "\n";
+                            }
+                            FANS += "\t);\n\n";
+
+                            // Create inner signals now and replacemnts
+                            std::string sf = sfx[0];
+                            TRIP_SIGNALS += "\t" + OP + string_format(" net_%s%s", name.c_str(), sf.c_str());
+                            if (!value.empty()) TRIP_SIGNALS += string_format(" = %s", value.c_str());
+                            TRIP_SIGNALS += ";\n";
+
+                            if (!subports.contains(sf)) subports[sf] = {};
+                            subports[sf][name] = "net_" + name + sf;
+                        }
+
                     }
-
-                    // We have to create a majorityVoter for each output
-                    VOTERS += string_format("\tmajorityVoter #(.WIDTH(1)) %s_Voter(\n",name.c_str());
-                    VOTERS += string_format("\t\t.inA(%sA),\n",name.c_str());
-                    VOTERS += string_format("\t\t.inB(%sB),\n",name.c_str());
-                    VOTERS += string_format("\t\t.inC(%sC),\n",name.c_str());
-                    VOTERS += string_format("\t\t.out(%s)\n",name.c_str());
-                    VOTERS += "\t);\n\n";
-
-                    // Append to gen_INST
-                    gen_INST += string_format("\t\t.%s\t(%s$)", name.c_str(), name.c_str());
-                    if ((i < (noutputs - 1))) gen_INST += ",";
-                    gen_INST += "\n";
 
                 }
 
-                DEF += "\n";
 
+                DEF += "\n";
                 // Append triplicated signals
                 DEF += "\t//Triplicated signals\n";
                 DEF += TRIP_SIGNALS;
@@ -201,43 +371,64 @@ void triplicate_modules(int TMR,
 
                 // Create the three instances of the reference module
                 DEF += "\t// Module instances replication\n";
-                for (auto& sf: sfx){
-                    std::string INST = gen_INST;
-                    size_t pos;
-                    while ((pos = INST.find("$")) != std::string::npos) {
-                        INST.replace(pos, 1, sf);
+                for (auto& sfp: subports){
+                    std::string sf = sfp.first;
+                    DEF += string_format("\t%s inst_%s (\n", ref.c_str(), sf.c_str());
+
+                    int nsfp = sfp.second.size();
+                    int k = 0;
+                    for (auto& ssp: sfp.second){
+                        DEF += string_format("\t\t.%s(%s)",ssp.first.c_str(),ssp.second.c_str());
+                        if (k < (nsfp-1)) DEF += ",";
+                        DEF += "\n";
                     }
-                    DEF += string_format("\t%s inst_%s (\n", ref.c_str(), sf.c_str()) + INST;
                     DEF += "\t);\n\n";
                 }
 
                 // Include fanouts
-                DEF += "\t// Fanouts\n";
+                if (!FANS.empty()) DEF += "\t// Fanouts\n";
                 DEF += FANS;
 
                 // Include voters
-                DEF += "\t// Voters\n";
+                if (!VOTERS.empty()) DEF += "\t// Voters\n";
                 DEF += VOTERS;
 
                 // Close module def
                 DEF += ");\n";
 
                 // Finally, write to file
-                std::string FILEPATH = OUTPATH + PATH_SEPARATOR + ref + TMR_SUFFIX + ".v";
+                FILEPATH_OUT = OUTPATH + PATH_SEPARATOR + ref + TMR_SUFFIX + ".v";
                 std::ofstream of;
-                of.open (FILEPATH);
+                of.open (FILEPATH_OUT);
                 of << DEF;
                 of.close();
 
-                // Print to console
-                std::cout << "[INFO] - FULL-TMR successfully applied to module " + ref + " and stored in " + FILEPATH << std::endl;
+            } else {
+                // Just copy the original file over
+                std::string FILEPATH_IN = OUTPATH + PATH_SEPARATOR + ref + ".v";
+                FILEPATH_OUT = OUTPATH + PATH_SEPARATOR + ref + TMR_SUFFIX + ".v";
+                std::filesystem::copy(FILEPATH_IN, FILEPATH_OUT);
 
             }
+
+            // Print to console
+            std::string pref = "TMR of ";
+            std::vector<std::string> p;
+            for (auto& kp: std::map<std::string, bool>({{"inputs",inTMR},{"clock",clkTMR},{"logic",logicTMR},{"outputs",outTMR}})) if (kp.second) p.push_back(kp.first);
+            int nps = p.size();
+            for (int k = 0; k < nps; k++){
+                pref += p[k];
+                if (k < (nps-1)) pref += ", ";
+            }
+            if (fullTMR) pref = "Full-TMR";
+            std::cout << "[INFO] - " + pref + " successfully applied to module " + ref + " and stored in " + FILEPATH_OUT << std::endl;
 
         }
 
     } else {
-        std::cout << "[ERROR] - TMR class unrecognized or not implemented yet: " << TMR << std::endl;
+        std::cout << "[ERROR] - TMR class(es) unrecognized or not implemented yet: ";
+        for (const auto& s: TMR) std::cout << s;
+        std::cout << std::endl;
     }
 
 }
