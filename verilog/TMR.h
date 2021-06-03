@@ -8,7 +8,7 @@
 void triplicate_modules(std::vector<std::string>& TMR,
                         std::vector<std::vector<std::string>>& subsets,
                         std::map<std::string,VerilogBlock>& module_references,
-                        std::map<std::string, std::string> __serial_instances__,
+                        std::map<std::string, std::vector<std::string>> __serial_instances__,
                         std::map<std::string, std::string> __serial_sources__,
                         std::string TMR_SUFFIX = "TMR",
                         std::string OUTPATH = "");

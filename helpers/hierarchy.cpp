@@ -13,7 +13,7 @@ std::map<std::string, std::string> Hierarchy::get_sources(){
     return __serial_sources__;
 };
 
-std::map<std::string, std::string> Hierarchy::get_instances(){
+std::map<std::string, std::vector<std::string>> Hierarchy::get_instances(){
     return __serial_instances__;
 };
 
@@ -58,7 +58,7 @@ int Hierarchy::save_json(std::string FILEPATH) {
 }
 
 // Parse Json
-bool Hierarchy::serialize_hierarchy(const Json::Value& val,  std::string carry, std::string parent_src){
+bool Hierarchy::serialize_hierarchy(const Json::Value& val,  std::string carry, std::string carry_ref, std::string parent_src){
 
     bool is_entity = true;
     std::vector<std::string> blacklist = {"ref","arrayspan", "bitspan", "type", "value",
@@ -75,7 +75,10 @@ bool Hierarchy::serialize_hierarchy(const Json::Value& val,  std::string carry, 
 
                     is_entity &= (std::find(blacklist.begin(),blacklist.end(),key) == blacklist.end());
 
+                    std::vector<std::string> inst_refs;
                     std::string carry_tmp = (!carry.empty() ? carry + "." + key : key);
+                    std::string carry_ref_tmp3 = (!carry_ref.empty() ? carry_ref + "." + key : key);
+                    std::string carry_ref_tmp, carry_ref_tmp2 = carry_ref;
 
                     // Go deeper if you can
                     if (is_entity){
@@ -86,8 +89,18 @@ bool Hierarchy::serialize_hierarchy(const Json::Value& val,  std::string carry, 
                             if (std::find(nkeys.begin(), nkeys.end(), "ref") != nkeys.end()) {
                                 ref = val[key]["ref"].asString();
                             }
+
+                            carry_ref_tmp = (!carry_ref.empty() ? carry_ref + "." + ref : ref);
+                            carry_ref_tmp2 = (!carry.empty() ? carry + "." + ref : ref);
+
                         }
-                        __serial_instances__.insert(std::pair<std::string, std::string>(carry_tmp,ref));
+                        inst_refs.push_back(ref);
+                        inst_refs.push_back(carry_tmp);
+                        inst_refs.push_back(carry_ref_tmp);
+                        inst_refs.push_back(carry_ref_tmp2);
+                        inst_refs.push_back(carry_ref_tmp3);
+                        __serial_instances__.insert(std::pair<std::string, std::vector<std::string>>(carry_tmp,inst_refs));
+                        //std::cout << carry_tmp << " " << carry_ref_tmp << " " << carry_ref_tmp2 << " " << carry_ref_tmp3 << std::endl;
 
                         std::string next_src = parent_src;
                         if (std::find(keys.begin(),keys.end(),"sourcefile_") != keys.end()){
@@ -98,7 +111,7 @@ bool Hierarchy::serialize_hierarchy(const Json::Value& val,  std::string carry, 
                             __serial_sources__.insert(std::pair<std::string,std::string>(carry, parent_src));
                         }
 
-                        serialize_hierarchy(val[key], carry_tmp, next_src);
+                        serialize_hierarchy(val[key], carry_tmp, carry_ref_tmp, next_src);
 
                     }
 
@@ -126,24 +139,33 @@ std::vector<std::vector<std::string>> Hierarchy::subset(std::vector<std::string>
         for (const auto& pair: __serial_instances__){
             std::smatch sm;
             std::string ent = pair.first;
-            std::string ref = pair.second;
-            if (regex_search(ent, sm, r)) {
-                std::cout << string_format("\tPattern %s found in hierarchy in instance %s of type %s",pat.c_str(),ent.c_str(),ref.c_str()) << std::endl;
+            std::vector<std::string> refs = pair.second;
 
-                std::string ent_tmp = ent;
-                for (int i=1; i< sm.size(); i++) {
-                    ent_tmp.replace(sm.position(i),sm.position(i)+sm[i].str().size(),"$");
+            std::string rf = refs[0];
+            std::vector<std::string> Rs = {refs.begin()+1,refs.end()};
+
+            for (const auto& ref: Rs){
+                if (regex_search(ref, sm, r)) {
+                    std::cout << string_format("\tPattern %s found in hierarchy in instance %s with reference %s",pat.c_str(),ent.c_str(),rf.c_str()) << std::endl;
+
+                    std::string ent_tmp = ent;
+                    for (int i=1; i< sm.size(); i++) {
+                        ent_tmp.replace(sm.position(i),sm.position(i)+sm[i].str().size(),"$");
+                    }
+
+                    if (!out_subset.contains(ent_tmp)){
+                        out_subset.insert(std::pair<std::string, std::vector<std::string>>(ent_tmp,{ent}));
+                    } else {
+                        out_subset.at(ent_tmp).push_back(ent);
+                    }
+                    break;
                 }
-
-                if (!out_subset.contains(ent_tmp)){
-                    out_subset.insert(std::pair<std::string, std::vector<std::string>>(ent_tmp,{ent}));
-                } else {
-                    out_subset.at(ent_tmp).push_back(ent);
-                }
-
             }
+
         }
     }
+
+    if (out_subset.empty()) std::cout << "No patterns found in subset" << std::endl;
 
     std::vector<std::vector<std::string>> out;
 

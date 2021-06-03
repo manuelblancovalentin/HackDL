@@ -12,7 +12,7 @@
 void triplicate_modules(std::vector<std::string>& TMR,
                         std::vector<std::vector<std::string>>& subsets,
                         std::map<std::string,VerilogBlock>& module_references,
-                        std::map<std::string, std::string> __serial_instances__,
+                        std::map<std::string, std::vector<std::string>> __serial_instances__,
                         std::map<std::string, std::string> __serial_sources__,
                         std::string TMR_SUFFIX = "TMR",
                         std::string OUTPATH = ""){
@@ -53,7 +53,7 @@ void triplicate_modules(std::vector<std::string>& TMR,
                     std::cout << "\t\tFound at " << src.c_str() << std::endl;
 
                     // mod reference
-                    std::string ref = __serial_instances__[ss];
+                    std::string ref = __serial_instances__[ss].at(0);
 
                     // Which we will replace with
                     std::string rep = ref + TMR_SUFFIX;
@@ -78,6 +78,7 @@ void triplicate_modules(std::vector<std::string>& TMR,
 
                     // Check if we have already executed this instruction for this file
                     std::string cmd = "sed -i '' -e 's/" + ref + "/" + rep + "/g' " + outpath;
+                    //std::cout << cmd << std::endl;
 
                     bool notexec = true;
                     for (const auto& el: mod_files[outpath]){
@@ -112,7 +113,159 @@ void triplicate_modules(std::vector<std::string>& TMR,
                 std::map<std::string,std::map<std::string,std::string>> subports;
 
                 // Start building the string
-                std::string DEF = string_format("module %s (\n\n", rep.c_str());
+                std::string DEF, DEF_GEN = "";
+                if (fullTMR) {
+                    // Create general module with three instances, fanouts and triplicated signals
+                    DEF = string_format("module %s;\n\n", rep.c_str());
+                    // Fanout in signals (clk included)
+
+                    // Inputs
+                    DEF += "\t// Input signals\n";
+                    size_t ninputs = ports.input.size();
+                    for (int i=0; i < ninputs; i++) {
+                        std::string name = ports.input[i];
+
+                        // Try to find the netwire entry for this port
+                        std::string type, bitspan, arrayspan, value = "";
+
+                        for (auto &el: netwires) {
+                            if (el.name == name) {
+                                type = el.type;
+                                if (el.bitspan != "[0:0]") bitspan = el.bitspan;
+                                if (el.arrayspan != "[0:0]") arrayspan = el.arrayspan;
+                                value = el.value;
+                            }
+                        }
+
+                        std::string IP = "";
+                        if (!type.empty()) IP += string_format("%s", type.c_str());
+                        if (!bitspan.empty()) IP += string_format(" %s", bitspan.c_str());
+                        if (!arrayspan.empty()) IP += string_format("%s", arrayspan.c_str());
+
+                        std::string IP2 = IP + string_format(" %s", name.c_str());
+                        if (!value.empty()) IP2 += string_format(" = %s", value.c_str());
+
+                        DEF += "\tinput";
+                        if (!bitspan.empty()) DEF += string_format(" %s", bitspan.c_str());
+                        if (!arrayspan.empty()) DEF += string_format("%s", arrayspan.c_str());
+                        DEF += " " + name + ";\n";
+
+                    }
+
+                    // Outputs
+                    DEF += "\n\t// Output signals\n";
+                    size_t noutputs = ports.output.size();
+                    for (int i=0; i < noutputs; i++) {
+                        std::string name = ports.input[i];
+
+                        // Try to find the netwire entry for this port
+                        std::string type, bitspan, arrayspan, value = "";
+
+                        for (auto &el: netwires) {
+                            if (el.name == name) {
+                                type = el.type;
+                                if (el.bitspan != "[0:0]") bitspan = el.bitspan;
+                                if (el.arrayspan != "[0:0]") arrayspan = el.arrayspan;
+                                value = el.value;
+                            }
+                        }
+
+                        std::string IP = "";
+                        if (!type.empty()) IP += string_format("%s", type.c_str());
+                        if (!bitspan.empty()) IP += string_format(" %s", bitspan.c_str());
+                        if (!arrayspan.empty()) IP += string_format("%s", arrayspan.c_str());
+
+                        std::string IP2 = IP + string_format(" %s", name.c_str());
+                        if (!value.empty()) IP2 += string_format(" = %s", value.c_str());
+
+                        DEF += "\toutput";
+                        if (!bitspan.empty()) DEF += string_format(" %s", bitspan.c_str());
+                        if (!arrayspan.empty()) DEF += string_format("%s", arrayspan.c_str());
+                        DEF += " " + name + ";\n";
+
+                    }
+
+                    // Now triplication of signals
+                    DEF += "\n\n\t// Fanouts\n";
+
+                    for (int i=0; i < ninputs; i++) {
+                        std::string name = ports.input[i];
+
+                        // Fanout
+                        DEF += string_format("\tfanout #(.WIDTH(1)) %s_fanout(\n", name.c_str());
+                        DEF += string_format("\t\t.in(%s),\n", name.c_str());
+                        for (int j = 0; j < nsfxs; j++) {
+                            DEF += "\t\t.out" + sfx[j] + "(" + name + sfx[j] + ")";
+                            if (j < (nsfxs - 1)) DEF += ",";
+                            DEF += "\n";
+                        }
+                        DEF += "\t);\n\n";
+
+                    } // Loop thru inputs
+
+                    // Create triplicated instances of module
+                    std::size_t nouts = ports.output.size();
+
+                    for (int j = 0; j < nsfxs; j++) {
+                        std::string sf = sfx[j];
+                        DEF += "\t// Instance " + sf + "\n";
+                        DEF += string_format("\t%s_inner inst_%s (", rep.c_str(), sf.c_str());
+                        // ins
+                        for (int ki=0; ki < ninputs; ki++) {
+                            std::string in_name = ports.input[ki];
+                            DEF += string_format(".%s(%s%s)",in_name.c_str(),in_name.c_str(),sf.c_str());
+                            if (nouts > 0) DEF += ",";
+                        }
+
+                        //outs
+                        for (int ko=0; ko < nouts; ko++) {
+                            std::string out_name = ports.output[ko];
+                            DEF += string_format(".%s(%s%s)",out_name.c_str(),out_name.c_str(),sf.c_str());
+                            if (ko < (nouts - 1)) DEF += ",";
+                        }
+                        // close
+                        DEF += ");\n\n";
+                    }
+
+
+                    // Vote outputs out
+                    DEF += "\n\t// Vote out\n";
+                    for (int ko=0; ko < noutputs; ko++) {
+                        std::string out_name = ports.output[ko];
+
+                        DEF += string_format("\tmajorityVoter #(.WIDTH(1)) %s_Voter(\n", out_name.c_str());
+                        for (int k = 0; k < nsfxs; k++) {
+                            DEF += string_format("\t\t.in%s(%s%s)", sfx[k].c_str(), out_name.c_str(), sfx[k].c_str());
+                            if (k < (nsfxs - 1)) DEF += ",";
+                            DEF += "\n";
+                        }
+                        // Use first suffix for consistency
+                        DEF += string_format("\t\t.out(%s)\n", out_name.c_str());
+                        DEF += "\t);\n\n";
+                    }
+
+                    for (auto& sfp: subports){
+                        std::string sf = sfp.first;
+                        DEF += string_format("\t%s_inner inst_%s (\n", rep.c_str(), sf.c_str());
+
+                        int nsfp = sfp.second.size();
+                        int k = 0;
+                        for (auto& ssp: sfp.second){
+                            DEF += string_format("\t\t.%s(%s)",ssp.first.c_str(),ssp.second.c_str());
+                            if (k < (nsfp-1)) DEF += ",";
+                            DEF += "\n";
+                        }
+                        DEF += "\t);\n\n";
+                    }
+
+                    // close module
+                    DEF += "endmodule\n\n";
+
+                    DEF += string_format("module %s_inner;\n\n", rep.c_str()); // Inner instance
+
+                } else {
+                    DEF = string_format("module %s;\n\n", rep.c_str());
+                }
                 std::string FANS = "";
                 std::string VOTERS = "";
                 std::string ori_INST = "";

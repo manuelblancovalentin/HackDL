@@ -14,7 +14,7 @@ private:
     //Json::Value __hierarchy__;
     Json::Value __hierarchy__;
     Json::Value __sources__;
-    std::map<std::string, std::string> __serial_instances__;
+    std::map<std::string, std::vector<std::string>> __serial_instances__;
     std::map<std::string, std::string> __serial_sources__;
 
     // Tree
@@ -29,7 +29,7 @@ public:
     int load_json(std::string FILEPATH);
 
     std::map<std::string, std::string> get_sources();
-    std::map<std::string, std::string> get_instances();
+    std::map<std::string, std::vector<std::string>> get_instances();
 
     // Method to print tree
     void print(void) {std::cout << __hierarchy__; std::cout << std::endl; }
@@ -40,7 +40,7 @@ public:
 
     // Method to find subset according to pattern
     std::vector<std::vector<std::string>> subset(std::vector<std::string> patterns);
-    bool serialize_hierarchy(const Json::Value& val, std::string carry = "", std::string src = "");
+    bool serialize_hierarchy(const Json::Value& val, std::string carry = "", std::string carry_ref = "", std::string src = "");
 };
 
 
